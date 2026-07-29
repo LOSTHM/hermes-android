@@ -226,7 +226,7 @@ class GatewayClient(
                 put("params", params)
             }
 
-            val sent = ws.send(json.encodeToString(frame))
+            val sent = ws.send(frame.toString())
             if (!sent) {
                 pending.remove(id)
                 throw GatewayNotConnectedException(notConnectedMessage)

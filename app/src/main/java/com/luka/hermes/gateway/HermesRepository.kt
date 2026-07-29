@@ -89,7 +89,7 @@ class HermesRepository(
      * Handles both `[…]` and `{"sessions":[…]}` response shapes.
      */
     suspend fun listSessions(): List<Session> {
-        val result = client.request<JsonElement>(RpcMethods.SESSION_LIST)
+        val result = client.request(RpcMethods.SESSION_LIST)
         val array = when (result) {
             is JsonArray -> result
             is JsonObject -> result["sessions"]?.jsonArray
