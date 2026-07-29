@@ -3,6 +3,7 @@ package com.luka.hermes.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.luka.hermes.gateway.*
+import kotlinx.serialization.json.*
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow

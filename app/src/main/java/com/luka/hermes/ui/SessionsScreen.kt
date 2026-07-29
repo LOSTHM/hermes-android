@@ -1,7 +1,5 @@
 package com.luka.hermes.ui
 
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -45,6 +44,7 @@ import com.luka.hermes.gateway.Session
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun SessionsScreen(
     viewModel: SessionsViewModel,
     onSessionSelected: (String) -> Unit,
