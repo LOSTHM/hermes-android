@@ -62,5 +62,6 @@ dependencies {
     implementation(libs.gson)
     implementation(libs.coil)
     implementation(libs.material)
+    implementation(libs.datastore.preferences)
     debugImplementation(libs.compose.ui.tooling)
 }
