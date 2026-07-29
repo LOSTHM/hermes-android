@@ -1,0 +1,50 @@
+{
+  "hermes_version": "0.19.0",
+  "captured_at": "2026-07-29",
+  "note": "App 已验证/已接入的协议面。rpc_methods 与 rest_endpoints 是基线快照; app_supported 子集是 App 实际实现的。新增=上游加了可忽略或接入, 移除=必须处理。",
+  "counts": {
+    "rpc": 123,
+    "rest": 223
+  },
+  "app_supported_rpc": [
+    "session.create",
+    "session.list",
+    "session.resume",
+    "session.activate",
+    "session.delete",
+    "session.title",
+    "session.history",
+    "session.status",
+    "session.usage",
+    "session.interrupt",
+    "session.compress",
+    "session.branch",
+    "session.undo",
+    "prompt.submit",
+    "clarify.respond",
+    "approval.respond",
+    "sudo.respond",
+    "secret.respond",
+    "image.attach_bytes",
+    "file.attach",
+    "model.options",
+    "config.get",
+    "config.set",
+    "config.show",
+    "tools.list",
+    "toolsets.list",
+    "skills.manage",
+    "plugins.list",
+    "cron.manage",
+    "agents.list"
+  ],
+  "app_supported_rest": [
+    "get /api/status",
+    "get /api/cron/jobs",
+    "get /api/sessions",
+    "get /api/config",
+    "get /api/skills",
+    "get /api/mcp/servers",
+    "get /api/logs"
+  ]
+}
