@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Hermes" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Material3 theming is handled via Compose MaterialTheme in code -->
+    </style>
+</resources>

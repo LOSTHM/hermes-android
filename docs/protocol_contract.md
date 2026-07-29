@@ -8,6 +8,16 @@
 - 响应 `{id, result}` 或 `{id, error:{code, message}}`
 - 事件 `{method:"event", params:{type, session_id, payload}}`
 
+## 认证
+
+- **WebSocket** `/api/ws`：`?token=<token>` query 参数（loopback 模式）
+- **REST** `/api/*`：`X-Hermes-Session-Token: <token>` header（**不是** `?token=`，大多数端点 query token 会 401；少数 public 端点如 `/api/status` 例外）
+- token 从 `~/.hermes/app_token` 读
+
+## REST 响应（已实测）
+
+- `GET /api/sessions?limit=N` → `{sessions:[{id, source, model, started_at, ended_at, message_count, tool_call_count, input_tokens, output_tokens, estimated_cost_usd, cwd, git_branch, ...}]}`。字段很多，UI 取 id/model/started_at/message_count 即可
+
 ## 事件 payload（按 type）
 
 ### message 流
