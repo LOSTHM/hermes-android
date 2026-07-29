@@ -2,6 +2,7 @@ package com.luka.hermes.gateway
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -75,7 +76,7 @@ class HermesRepository(
      * Create a new conversation session.
      */
     suspend fun createSession(title: String): Session {
-        val result = client.request<JsonElement>(
+        val result = client.request(
             RpcMethods.SESSION_CREATE,
             buildJsonObject { put("title", JsonPrimitive(title)) },
         )
@@ -103,7 +104,7 @@ class HermesRepository(
      * Delete a session by ID.
      */
     suspend fun deleteSession(sessionId: String) {
-        client.request<JsonElement>(
+        client.request(
             RpcMethods.SESSION_DELETE,
             buildJsonObject { put("session_id", JsonPrimitive(sessionId)) },
         )
@@ -136,7 +137,7 @@ class HermesRepository(
 
         launch {
             try {
-                client.request<JsonElement>(
+                client.request(
                     RpcMethods.PROMPT_SUBMIT,
                     buildJsonObject {
                         put("session_id", JsonPrimitive(sessionId))
@@ -215,7 +216,7 @@ class HermesRepository(
 
     /** Interrupt the current generation in the given session. */
     suspend fun interruptSession(sessionId: String) {
-        client.request<JsonElement>(
+        client.request(
             RpcMethods.SESSION_INTERRUPT,
             buildJsonObject { put("session_id", JsonPrimitive(sessionId)) },
         )

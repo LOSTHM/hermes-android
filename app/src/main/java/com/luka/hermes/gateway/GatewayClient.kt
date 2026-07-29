@@ -207,11 +207,11 @@ class GatewayClient(
      * @throws GatewayTimeoutException if [timeoutMs] elapses.
      * @throws GatewayRpcException if the server returns an error frame.
      */
-    suspend inline fun <reified T> request(
+    suspend fun request(
         method: String,
         params: JsonObject = buildJsonObject { },
         timeoutMs: Long = requestTimeoutMs,
-    ): T {
+    ): JsonElement {
         val ws = socket ?: throw GatewayNotConnectedException(notConnectedMessage)
 
         val id = nextId.incrementAndGet()
@@ -236,12 +236,7 @@ class GatewayClient(
                 deferred.await()
             }
 
-            @Suppress("UNCHECKED_CAST")
-            return when {
-                T::class == JsonElement::class -> resultElement as T
-                T::class == Unit::class -> Unit as T
-                else -> json.decodeFromJsonElement<T>(resultElement)
-            }
+            return resultElement
         } catch (e: TimeoutCancellationException) {
             pending.remove(id)
             if (!deferred.isCompleted) {

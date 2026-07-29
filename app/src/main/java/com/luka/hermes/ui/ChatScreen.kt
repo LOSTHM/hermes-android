@@ -46,6 +46,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.luka.hermes.gateway.ConnectionState
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun ChatScreen(
     sessionId: String,
     viewModel: ChatViewModel,
@@ -82,7 +83,7 @@ fun ChatScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
             )
@@ -248,7 +249,7 @@ private fun InputBar(
             Spacer(Modifier.width(8.dp))
             if (isStreaming) {
                 FilledIconButton(onClick = onStop) {
-                    Icon(Icons.Default.Stop, contentDescription = "Stop")
+                    Icon(Icons.Filled.Stop, contentDescription = "Stop")
                 }
             } else {
                 FilledIconButton(

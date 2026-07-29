@@ -56,7 +56,7 @@ data class RpcError(
 // ── Exceptions ──────────────────────────────────────────────────────────────
 
 /** Generic exception thrown by the gateway layer. */
-class GatewayException(
+open class GatewayException(
     message: String,
     cause: Throwable? = null,
 ) : Exception(message, cause)
