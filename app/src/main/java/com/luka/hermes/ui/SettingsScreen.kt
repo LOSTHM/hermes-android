@@ -1,46 +1,14 @@
 package com.luka.hermes.ui
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.luka.hermes.gateway.ConnectionState
@@ -61,256 +29,210 @@ fun SettingsScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-    ) {
-        Text(text = "Settings", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(24.dp))
-
-        // ── Theme ──
-        Text(text = "Theme", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(8.dp))
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            SegmentedButton(
-                selected = uiState.themeMode == ThemeMode.SYSTEM,
-                onClick = { viewModel.updateThemeMode(ThemeMode.SYSTEM) },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
-            ) { Text("System") }
-            SegmentedButton(
-                selected = uiState.themeMode == ThemeMode.LIGHT,
-                onClick = { viewModel.updateThemeMode(ThemeMode.LIGHT) },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
-            ) { Text("Light") }
-            SegmentedButton(
-                selected = uiState.themeMode == ThemeMode.DARK,
-                onClick = { viewModel.updateThemeMode(ThemeMode.DARK) },
-                shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
-            ) { Text("Dark") }
-        }
-
-        Spacer(Modifier.height(24.dp))
-
-        // ── Chat Mode ──
-        Text(text = "Chat Mode", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(8.dp))
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            SegmentedButton(
-                selected = uiState.chatMode == ChatMode.HERMES,
-                onClick = { viewModel.updateChatMode(ChatMode.HERMES) },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-            ) { Text("Hermes") }
-            SegmentedButton(
-                selected = uiState.chatMode == ChatMode.DIRECT,
-                onClick = { viewModel.updateChatMode(ChatMode.DIRECT) },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-            ) { Text("Direct API") }
-        }
-
-        Spacer(Modifier.height(24.dp))
-
-        // ── Hermes mode ──
-        if (uiState.chatMode == ChatMode.HERMES) {
-            Text(text = "Hermes API Token", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = uiState.hermesToken,
-                onValueChange = viewModel::updateHermesToken,
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Paste your token here") },
-                singleLine = true,
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Settings", style = MaterialTheme.typography.headlineSmall) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
             )
-            Spacer(Modifier.height(16.dp))
-            ConnectionStatusCard(connectionState)
-        }
-
-        // ── Direct API mode ──
-        if (uiState.chatMode == ChatMode.DIRECT) {
-            // Base URL
-            Text(text = "API Base URL", style = MaterialTheme.typography.titleMedium)
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+        ) {
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = uiState.apiBaseUrl,
-                onValueChange = viewModel::updateApiBaseUrl,
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("https://llmapi.tripln.top:5000/v1") },
-                singleLine = true,
-            )
-            Spacer(Modifier.height(16.dp))
 
-            // API Key
-            Text(text = "API Key", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = uiState.apiKey,
-                onValueChange = viewModel::updateApiKey,
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("sk-...") },
-                singleLine = true,
-            )
-            Spacer(Modifier.height(16.dp))
-
-            // Model dropdown
-            Text(text = "Model", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            ModelDropdown(
-                models = uiState.apiModels,
-                selected = uiState.apiModel,
-                onSelected = viewModel::updateApiModel,
-            )
-            Spacer(Modifier.height(16.dp))
-
-            // Test connection
-            OutlinedButton(
-                onClick = viewModel::testDirectConnection,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !uiState.testing && uiState.apiBaseUrl.isNotBlank() && uiState.apiKey.isNotBlank(),
-            ) {
-                if (uiState.testing) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(8.dp))
+            // ── Theme Section ──
+            SettingsSectionHeader("Appearance")
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                ThemeMode.entries.forEachIndexed { i, mode ->
+                    SegmentedButton(
+                        selected = uiState.themeMode == mode,
+                        onClick = { viewModel.updateThemeMode(mode) },
+                        shape = SegmentedButtonDefaults.itemShape(i, ThemeMode.entries.size),
+                    ) { Text(mode.name) }
                 }
-                Text(if (uiState.testing) "Testing…" else "Test Connection")
             }
 
-            uiState.testResult?.let { result ->
+            Spacer(Modifier.height(24.dp))
+
+            // ── Chat Mode Section ──
+            SettingsSectionHeader("Connection")
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                SegmentedButton(
+                    selected = uiState.chatMode == ChatMode.HERMES,
+                    onClick = { viewModel.updateChatMode(ChatMode.HERMES) },
+                    shape = SegmentedButtonDefaults.itemShape(0, 2),
+                ) { Text("Daemon") }
+                SegmentedButton(
+                    selected = uiState.chatMode == ChatMode.DIRECT,
+                    onClick = { viewModel.updateChatMode(ChatMode.DIRECT) },
+                    shape = SegmentedButtonDefaults.itemShape(1, 2),
+                ) { Text("Direct API") }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // ── Hermes Mode ──
+            if (uiState.chatMode == ChatMode.HERMES) {
+                SettingsSectionHeader("Hermes Daemon")
+                OutlinedTextField(
+                    value = uiState.hermesToken,
+                    onValueChange = viewModel::updateHermesToken,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Token") },
+                    placeholder = { Text("Paste your token") },
+                    singleLine = true,
+                )
                 Spacer(Modifier.height(8.dp))
+                ConnectionStatusCard(connectionState)
+            }
+
+            // ── Direct API Mode ──
+            if (uiState.chatMode == ChatMode.DIRECT) {
+                SettingsSectionHeader("API Configuration")
+                OutlinedTextField(
+                    value = uiState.apiBaseUrl,
+                    onValueChange = viewModel::updateApiBaseUrl,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Base URL") },
+                    placeholder = { Text("https://api.example.com/v1") },
+                    singleLine = true,
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = uiState.apiKey,
+                    onValueChange = viewModel::updateApiKey,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("API Key") },
+                    placeholder = { Text("sk-...") },
+                    singleLine = true,
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = uiState.apiModel,
+                    onValueChange = viewModel::updateApiModel,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Model") },
+                    placeholder = { Text("qwen3.6") },
+                    singleLine = true,
+                )
+                Spacer(Modifier.height(12.dp))
+
+                OutlinedButton(
+                    onClick = viewModel::testDirectConnection,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !uiState.testing && uiState.apiBaseUrl.isNotBlank() && uiState.apiKey.isNotBlank(),
+                ) {
+                    if (uiState.testing) {
+                        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text(if (uiState.testing) "Testing…" else "Test Connection")
+                }
+
+                uiState.testResult?.let { result ->
+                    Spacer(Modifier.height(8.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (result.startsWith("✅")) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.errorContainer,
+                        ),
+                    ) {
+                        Text(text = result, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+
+                // Parameters
+                Spacer(Modifier.height(20.dp))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (result.startsWith("✅")) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
-                    ),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
                 ) {
-                    Text(text = result, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
-                }
-            }
-
-            Spacer(Modifier.height(20.dp))
-            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Parameters", style = MaterialTheme.typography.titleSmall)
-                    Spacer(Modifier.height(12.dp))
-
-                    // Temperature
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Parameters", style = MaterialTheme.typography.titleSmall)
+                        Spacer(Modifier.height(12.dp))
                         Text("Temperature: %.1f".format(uiState.temperature), style = MaterialTheme.typography.bodyMedium)
-                    }
-                    Slider(
-                        value = uiState.temperature,
-                        onValueChange = viewModel::updateTemperature,
-                        valueRange = 0f..2f,
-                        steps = 19,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-
-                    Spacer(Modifier.height(8.dp))
-
-                    // Max tokens
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Slider(
+                            value = uiState.temperature,
+                            onValueChange = viewModel::updateTemperature,
+                            valueRange = 0f..2f,
+                            steps = 19,
+                        )
+                        Spacer(Modifier.height(4.dp))
                         Text("Max Tokens: ${uiState.maxTokens}", style = MaterialTheme.typography.bodyMedium)
+                        Slider(
+                            value = uiState.maxTokens.toFloat(),
+                            onValueChange = { viewModel.updateMaxTokens(it.toInt()) },
+                            valueRange = 256f..8192f,
+                            steps = 30,
+                        )
                     }
-                    Slider(
-                        value = uiState.maxTokens.toFloat(),
-                        onValueChange = { viewModel.updateMaxTokens(it.toInt()) },
-                        valueRange = 256f..8192f,
-                        steps = 30,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
                 }
-            }
 
-            Spacer(Modifier.height(16.dp))
-
-            // System prompt
-            Text(text = "System Prompt", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = uiState.systemPrompt,
-                onValueChange = viewModel::updateSystemPrompt,
-                modifier = Modifier.fillMaxWidth().height(120.dp),
-                placeholder = { Text("You are a helpful assistant...") },
-                maxLines = 6,
-            )
-        }
-
-        Spacer(Modifier.height(24.dp))
-
-        Button(
-            onClick = viewModel::saveAndConnect,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Icon(Icons.Default.Check, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text("Save & Continue")
-        }
-
-        Spacer(Modifier.height(48.dp))
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ModelDropdown(models: List<String>, selected: String, onSelected: (String) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    val items = if (models.isNotEmpty()) models else listOf(selected.ifBlank { "qwen3.6" })
-    val currentText = selected.ifBlank { items.first() }
-
-    Box {
-        OutlinedTextField(
-            value = currentText,
-            onValueChange = onSelected,
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            readOnly = models.isNotEmpty(),
-            trailingIcon = {
-                IconButton(onClick = { expanded = !expanded }) {
-                    Icon(
-                        Icons.Default.ArrowDropDown,
-                        contentDescription = "Select model",
-                    )
-                }
-            },
-        )
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            items.forEach { model ->
-                DropdownMenuItem(
-                    text = { Text(model) },
-                    onClick = {
-                        onSelected(model)
-                        expanded = false
-                    },
+                // System Prompt
+                Spacer(Modifier.height(16.dp))
+                Text("System Prompt", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = uiState.systemPrompt,
+                    onValueChange = viewModel::updateSystemPrompt,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
+                    placeholder = { Text("You are a helpful assistant...") },
+                    maxLines = 6,
                 )
             }
+
+            Spacer(Modifier.height(24.dp))
+
+            Button(
+                onClick = viewModel::saveAndConnect,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Default.Check, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Save & Continue")
+            }
+
+            Spacer(Modifier.height(48.dp))
         }
     }
 }
 
 @Composable
-private fun ConnectionStatusCard(connectionState: ConnectionState) {
+private fun SettingsSectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(vertical = 8.dp),
+    )
+}
+
+@Composable
+private fun ConnectionStatusCard(state: ConnectionState) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Connection", style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(8.dp))
-            val (statusText, statusColor) = when (connectionState) {
-                ConnectionState.Idle -> "Idle" to Color.Gray
-                ConnectionState.Connecting -> "Connecting…" to Color(0xFFFFA000)
-                ConnectionState.Open -> "Connected" to Color(0xFF4CAF50)
-                ConnectionState.Closed -> "Disconnected" to Color.Gray
-                ConnectionState.Error -> "Error" to Color(0xFFE53935)
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            val (text, color) = when (state) {
+                ConnectionState.Idle -> "Idle" to MaterialTheme.colorScheme.outline
+                ConnectionState.Connecting -> "Connecting…" to MaterialTheme.colorScheme.tertiary
+                ConnectionState.Open -> "Connected" to MaterialTheme.colorScheme.primary
+                ConnectionState.Closed -> "Disconnected" to MaterialTheme.colorScheme.outline
+                ConnectionState.Error -> "Error" to MaterialTheme.colorScheme.error
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("\u25CF", color = statusColor)
-                Spacer(Modifier.width(8.dp))
-                Text(text = statusText)
-                if (connectionState == ConnectionState.Connecting) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp).padding(start = 8.dp), strokeWidth = 2.dp)
-                }
-            }
+            Text("\u25CF", color = color)
+            Spacer(Modifier.width(8.dp))
+            Text(text, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
