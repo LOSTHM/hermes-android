@@ -1,122 +1,135 @@
 package com.luka.hermes.ui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.luka.hermes.gateway.Session
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun SessionsScreen(
     viewModel: SessionsViewModel,
     onSessionSelected: (String) -> Unit,
     onDirectChat: () -> Unit,
-    onSettings: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var searchQuery by remember { mutableStateOf("") }
     var showDeleteDialog by remember { mutableStateOf<Session?>(null) }
     var showRenameDialog by remember { mutableStateOf<Session?>(null) }
+
+    // Filter sessions by search
+    val filteredSessions = remember(uiState.sessions, searchQuery) {
+        if (searchQuery.isBlank()) uiState.sessions
+        else uiState.sessions.filter { it.title?.contains(searchQuery, ignoreCase = true) == true }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Sessions") },
-                actions = {
-                    IconButton(onClick = { viewModel.loadSessions() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                    }
-                    IconButton(onClick = onSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
-                    }
-                },
+                title = { Text("Sessions", style = MaterialTheme.typography.headlineSmall) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { viewModel.createSession("New Chat", onCreated = { onSessionSelected(it.id) }) }) {
-                Icon(Icons.Default.Add, contentDescription = "New Session")
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.End,
+            ) {
+                // Direct API quick entry
+                SmallFloatingActionButton(
+                    onClick = onDirectChat,
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                ) {
+                    Icon(Icons.Default.Bolt, contentDescription = "Direct API Chat")
+                }
+                // New session
+                FloatingActionButton(
+                    onClick = { viewModel.createSession("New Chat", onCreated = { onSessionSelected(it.id) }) },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "New Session")
+                }
             }
         },
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
         ) {
+            // Search bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                placeholder = { Text("Search sessions...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear")
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(28.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                ),
+            )
+
             when {
                 uiState.loading && uiState.sessions.isEmpty() -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
                 }
                 uiState.error != null && uiState.sessions.isEmpty() -> {
                     Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
+                        Modifier.fillMaxSize().padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
                         Text(
                             text = uiState.error ?: "Unknown error",
                             color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyLarge,
                         )
                         Spacer(Modifier.height(16.dp))
-                        TextButton(onClick = { viewModel.loadSessions() }) {
+                        OutlinedButton(onClick = { viewModel.loadSessions() }) {
                             Text("Retry")
                         }
                     }
                 }
-                uiState.sessions.isEmpty() -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
+                filteredSessions.isEmpty() && !uiState.loading -> {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            text = "No sessions yet.\nTap + to create one.",
+                            text = if (searchQuery.isNotEmpty()) "No matching sessions"
+                            else "No sessions yet.\nTap + to create one.",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -124,114 +137,63 @@ fun SessionsScreen(
                 }
                 else -> {
                     LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        // Direct API chat entry
-                        item(key = "direct_chat") {
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .combinedClickable(onClick = onDirectChat),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                ),
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(
-                                        text = "⚡",
-                                        style = MaterialTheme.typography.titleLarge,
-                                    )
-                                    Spacer(Modifier.width(12.dp))
-                                    Column {
-                                        Text(
-                                            text = "Direct API Chat",
-                                            style = MaterialTheme.typography.titleMedium,
-                                        )
-                                        Text(
-                                            text = "Chat without Hermes daemon",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        items(uiState.sessions, key = { it.id }) { session ->
+                        items(filteredSessions, key = { it.id }) { session ->
                             SessionCard(
                                 session = session,
                                 onClick = { onSessionSelected(session.id) },
-                                onRenameClick = { showRenameDialog = session },
-                                onDeleteClick = { showDeleteDialog = session },
+                                onRename = { showRenameDialog = session },
+                                onDelete = { showDeleteDialog = session },
                             )
                         }
+                        item { Spacer(Modifier.height(80.dp)) } // FAB clearance
                     }
                 }
             }
         }
     }
 
-    // Delete confirmation dialog
+    // Dialogs
     showDeleteDialog?.let { session ->
         AlertDialog(
             onDismissRequest = { showDeleteDialog = null },
             title = { Text("Delete Session") },
             text = { Text("Delete \"${session.title ?: session.id}\"?") },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteSession(session.id)
-                        showDeleteDialog = null
-                    },
-                ) {
+                TextButton(onClick = { viewModel.deleteSession(session.id); showDeleteDialog = null }) {
                     Text("Delete", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = null }) {
-                    Text("Cancel")
-                }
+                TextButton(onClick = { showDeleteDialog = null }) { Text("Cancel") }
             },
         )
     }
 
-    // Rename dialog
     showRenameDialog?.let { session ->
         var newTitle by remember(session.id) { mutableStateOf(session.title ?: "") }
         AlertDialog(
             onDismissRequest = { showRenameDialog = null },
-            title = { Text("Rename Session") },
+            title = { Text("Rename") },
             text = {
                 OutlinedTextField(
                     value = newTitle,
                     onValueChange = { newTitle = it },
-                    label = { Text("New title") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
             },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (newTitle.isNotBlank()) {
-                            viewModel.renameSession(session.id, newTitle.trim())
-                        }
-                        showRenameDialog = null
-                    },
-                ) {
-                    Text("Rename")
-                }
+                TextButton(onClick = {
+                    if (newTitle.isNotBlank()) viewModel.renameSession(session.id, newTitle.trim())
+                    showRenameDialog = null
+                }) { Text("Rename") }
             },
             dismissButton = {
-                TextButton(onClick = { showRenameDialog = null }) {
-                    Text("Cancel")
-                }
+                TextButton(onClick = { showRenameDialog = null }) { Text("Cancel") }
             },
         )
     }
@@ -242,8 +204,8 @@ fun SessionsScreen(
 private fun SessionCard(
     session: Session,
     onClick: () -> Unit,
-    onRenameClick: () -> Unit,
-    onDeleteClick: () -> Unit,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -254,7 +216,11 @@ private fun SessionCard(
                 onClick = onClick,
                 onLongClick = { showMenu = true },
             ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
@@ -268,39 +234,27 @@ private fun SessionCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                if (session.status != null) {
-                    Text(
-                        text = session.status!!,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Text(
+                    text = session.status ?: "active",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
                 Text(
                     text = session.updatedAt ?: session.createdAt ?: "",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
 
-        // Context menu
-        DropdownMenu(
-            expanded = showMenu,
-            onDismissRequest = { showMenu = false },
-        ) {
+        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
             DropdownMenuItem(
                 text = { Text("Rename") },
-                onClick = {
-                    showMenu = false
-                    onRenameClick()
-                },
+                onClick = { showMenu = false; onRename() },
             )
             DropdownMenuItem(
                 text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
-                onClick = {
-                    showMenu = false
-                    onDeleteClick()
-                },
+                onClick = { showMenu = false; onDelete() },
             )
         }
     }

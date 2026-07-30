@@ -31,7 +31,6 @@ class MainActivity : ComponentActivity() {
             var initialRoute by remember { mutableStateOf("settings") }
             var themeMode by remember { mutableStateOf(ThemeMode.SYSTEM) }
 
-            // Read settings on first composition
             androidx.compose.runtime.LaunchedEffect(Unit) {
                 val prefs = applicationContext.settingsDataStore.data.first()
                 val token = prefs[SettingsKeys.TOKEN] ?: ""
@@ -57,10 +56,7 @@ class MainActivity : ComponentActivity() {
                 }
             } else {
                 HermesTheme(themeMode = themeMode) {
-                    HermesNavHost(
-                        initialRoute = initialRoute,
-                        tokenConfigured = initialRoute == "sessions",
-                    )
+                    HermesNavHost(initialRoute = initialRoute)
                 }
             }
         }

@@ -1,16 +1,19 @@
 package com.luka.hermes.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddComment
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.outlined.AddComment
+import androidx.compose.material.icons.outlined.Chat
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -24,47 +27,50 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 
-sealed class Screen(val route: String, val title: String, val icon: ImageVector?) {
-    object Sessions : Screen("sessions", "Sessions", Icons.Default.Chat)
-    object Chat : Screen("chat/{sessionId}", "Chat", null)
-    object DirectChat : Screen("direct_chat", "Direct Chat", null)
-    object Settings : Screen("settings", "Settings", Icons.Default.Settings)
+// ── Destinations ────────────────────────────────────────────────────────────
 
-    fun withArgs(vararg args: Pair<String, String>): String {
-        var r = route
-        args.forEach { (k, v) -> r = r.replace("{$k}", v) }
-        return r
-    }
-}
+data class BottomNavItem(
+    val route: String,
+    val title: String,
+    val selectedIcon: ImageVector,
+    val unselectedIcon: ImageVector,
+)
 
-private val bottomNavScreens = listOf(Screen.Sessions, Screen.Settings)
+private val bottomNavItems = listOf(
+    BottomNavItem("sessions", "Sessions", Icons.Filled.Chat, Icons.Outlined.Chat),
+    BottomNavItem("settings", "Settings", Icons.Filled.Settings, Icons.Outlined.Settings),
+)
 
+// ── Nav Host ────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HermesNavHost(
-    initialRoute: String = Screen.Sessions.route,
-    tokenConfigured: Boolean,
+    initialRoute: String = "sessions",
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+
     val settingsViewModel: SettingsViewModel = viewModel()
     val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
 
-    // Determine if we should show the bottom bar (not on chat screens)
-    val showBottomBar = currentDestination?.route in bottomNavScreens.map { it.route }
+    // Hide bottom bar on detail screens
+    val showBottomBar = currentDestination?.route in bottomNavItems.map { it.route }
 
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar {
-                    bottomNavScreens.forEach { screen ->
-                        val selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = NavigationBarDefaults.Elevation,
+                ) {
+                    bottomNavItems.forEach { item ->
+                        val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
                         NavigationBarItem(
-                            icon = { Icon(screen.icon!!, contentDescription = screen.title) },
-                            label = { Text(screen.title) },
                             selected = selected,
                             onClick = {
-                                navController.navigate(screen.route) {
+                                navController.navigate(item.route) {
                                     popUpTo(navController.graph.findStartDestination().id) {
                                         saveState = true
                                     }
@@ -72,6 +78,23 @@ fun HermesNavHost(
                                     restoreState = true
                                 }
                             },
+                            icon = {
+                                Icon(
+                                    imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
+                                    contentDescription = item.title,
+                                )
+                            },
+                            label = {
+                                Text(
+                                    text = item.title,
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            ),
                         )
                     }
                 }
@@ -83,24 +106,23 @@ fun HermesNavHost(
             startDestination = initialRoute,
             modifier = Modifier.padding(innerPadding),
         ) {
-            composable(Screen.Sessions.route) {
+            // Sessions / Chat list
+            composable("sessions") {
                 val sessionsViewModel: SessionsViewModel = viewModel()
                 SessionsScreen(
                     viewModel = sessionsViewModel,
-                    onSessionSelected = { sessionId ->
-                        navController.navigate(Screen.Chat.withArgs("sessionId" to sessionId))
+                    onSessionSelected = { id ->
+                        navController.navigate("chat/$id")
                     },
                     onDirectChat = {
-                        navController.navigate(Screen.DirectChat.route)
-                    },
-                    onSettings = {
-                        navController.navigate(Screen.Settings.route)
+                        navController.navigate("direct_chat")
                     },
                 )
             }
 
+            // Hermes session chat
             composable(
-                route = Screen.Chat.route,
+                route = "chat/{sessionId}",
                 arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),
             ) { backStackEntry ->
                 val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
@@ -113,7 +135,8 @@ fun HermesNavHost(
                 )
             }
 
-            composable(Screen.DirectChat.route) {
+            // Direct API chat
+            composable("direct_chat") {
                 val chatViewModel: ChatViewModel = viewModel()
                 chatViewModel.setChatMode(ChatMode.DIRECT)
                 chatViewModel.setDirectConfig(
@@ -131,12 +154,13 @@ fun HermesNavHost(
                 )
             }
 
-            composable(Screen.Settings.route) {
+            // Settings
+            composable("settings") {
                 SettingsScreen(
                     viewModel = settingsViewModel,
                     onConfigured = {
-                        navController.navigate(Screen.Sessions.route) {
-                            popUpTo(Screen.Sessions.route) { inclusive = true }
+                        navController.navigate("sessions") {
+                            popUpTo("sessions") { inclusive = true }
                         }
                     },
                 )
