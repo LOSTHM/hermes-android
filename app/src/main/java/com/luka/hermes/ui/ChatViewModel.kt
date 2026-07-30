@@ -3,27 +3,36 @@ package com.luka.hermes.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.luka.hermes.gateway.*
-import kotlinx.serialization.json.*
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.*
 
 // ── UI data types ──────────────────────────────────────────────────────────────
 
 enum class ToolStatus { Running, Complete }
 
+enum class ChatMode { HERMES, DIRECT }
+
 sealed class ChatItem {
-    data class UserMessage(val text: String) : ChatItem() {
-        override val stableId: String get() = "user-${hashCode()}"
+    abstract val stableId: String
+    abstract val timestamp: Long  // epoch millis
+
+    data class UserMessage(
+        val text: String,
+        override val timestamp: Long = System.currentTimeMillis(),
+    ) : ChatItem() {
+        override val stableId: String get() = "user-${hashCode()}-$timestamp"
     }
     data class AssistantMessage(
         val text: String,
         val isStreaming: Boolean,
+        override val timestamp: Long = System.currentTimeMillis(),
     ) : ChatItem() {
-        override val stableId: String get() = "assistant-${hashCode()}"
+        override val stableId: String get() = "assistant-${hashCode()}-$timestamp"
     }
     data class ToolCallCard(
         val name: String,
@@ -31,22 +40,23 @@ sealed class ChatItem {
         val args: String? = null,
         val result: String? = null,
         val summary: String? = null,
+        override val timestamp: Long = System.currentTimeMillis(),
     ) : ChatItem() {
         override val stableId: String get() = "tool-$name-${hashCode()}"
     }
     data class ThinkingBlock(
         val text: String,
+        override val timestamp: Long = System.currentTimeMillis(),
     ) : ChatItem() {
         override val stableId: String get() = "think-${hashCode()}"
     }
     data class ErrorItem(
         val message: String,
         val isColdStart: Boolean,
+        override val timestamp: Long = System.currentTimeMillis(),
     ) : ChatItem() {
         override val stableId: String get() = "error-${hashCode()}"
     }
-
-    abstract val stableId: String
 }
 
 data class ClarifyRequestData(
@@ -69,6 +79,14 @@ data class ChatUiState(
     val approvalRequest: ApprovalRequestData? = null,
     val coldStartWarning: Boolean = false,
     val inputText: String = "",
+    val chatMode: ChatMode = ChatMode.HERMES,
+    /** For DIRECT mode: base URL, key, model (from settings) */
+    val apiBaseUrl: String = "",
+    val apiKey: String = "",
+    val apiModel: String = "qwen3.6",
+    val temperature: Float = 0.7f,
+    val maxTokens: Int = 4096,
+    val systemPrompt: String = "",
 )
 
 // ── ViewModel ──────────────────────────────────────────────────────────────────
@@ -76,6 +94,7 @@ data class ChatUiState(
 class ChatViewModel : ViewModel() {
 
     private val repository = HermesClient.repository
+    private val directApi = HermesClient.directApi
     private var sessionId: String = ""
     private var streamJob: Job? = null
     private var coldStartJob: Job? = null
@@ -93,6 +112,54 @@ class ChatViewModel : ViewModel() {
             approvalRequest = null,
             coldStartWarning = false,
         )
+        // Load session history in Hermes mode
+        if (_uiState.value.chatMode == ChatMode.HERMES) {
+            loadSessionHistory(id)
+        }
+    }
+
+    fun setDirectConfig(baseUrl: String, apiKey: String, model: String, temperature: Float = 0.7f, maxTokens: Int = 4096, systemPrompt: String = "") {
+        _uiState.value = _uiState.value.copy(
+            apiBaseUrl = baseUrl,
+            apiKey = apiKey,
+            apiModel = model,
+            temperature = temperature,
+            maxTokens = maxTokens,
+            systemPrompt = systemPrompt,
+        )
+    }
+
+    fun setChatMode(mode: ChatMode) {
+        _uiState.value = _uiState.value.copy(chatMode = mode)
+    }
+
+    /**
+     * Load past messages for an existing Hermes session.
+     */
+    private fun loadSessionHistory(sessionId: String) {
+        viewModelScope.launch {
+            try {
+                val result = repository.getSessionHistory(sessionId)
+                val items = mutableListOf<ChatItem>()
+                // Expects array of { role, content } objects
+                if (result is JsonArray) {
+                    for (entry in result) {
+                        val obj = entry.jsonObject
+                        val role = obj["role"]?.jsonPrimitive?.contentOrNull ?: continue
+                        val content = obj["content"]?.jsonPrimitive?.contentOrNull ?: ""
+                        when (role) {
+                            "user" -> items.add(ChatItem.UserMessage(content))
+                            "assistant" -> items.add(ChatItem.AssistantMessage(content, false))
+                        }
+                    }
+                }
+                if (items.isNotEmpty()) {
+                    _uiState.value = _uiState.value.copy(messages = items)
+                }
+            } catch (_: Exception) {
+                // Silently ignore history load errors (fresh session, etc.)
+            }
+        }
     }
 
     fun onInputChanged(text: String) {
@@ -101,7 +168,23 @@ class ChatViewModel : ViewModel() {
 
     fun sendPrompt() {
         val text = _uiState.value.inputText.trim()
-        if (text.isEmpty() || sessionId.isEmpty()) return
+        if (text.isEmpty()) return
+
+        val mode = _uiState.value.chatMode
+
+        // For DIRECT mode, require config
+        if (mode == ChatMode.DIRECT) {
+            val cfg = _uiState.value
+            if (cfg.apiBaseUrl.isBlank() || cfg.apiKey.isBlank()) {
+                addError("Configure API key and base URL in Settings first")
+                return
+            }
+        }
+
+        if (mode == ChatMode.HERMES && sessionId.isEmpty()) {
+            addError("No active session")
+            return
+        }
 
         val userMsg = ChatItem.UserMessage(text = text)
         _uiState.value = _uiState.value.copy(
@@ -111,86 +194,34 @@ class ChatViewModel : ViewModel() {
             coldStartWarning = false,
         )
 
+        when (mode) {
+            ChatMode.HERMES -> startHermesPrompt(text)
+            ChatMode.DIRECT -> startDirectPrompt(text)
+        }
+    }
+
+    // ── Hermes daemon mode ──────────────────────────────────────────────
+
+    private fun startHermesPrompt(text: String) {
         startColdStartTimer()
 
         streamJob = viewModelScope.launch {
             try {
                 repository.sendPrompt(sessionId, text).collect { event ->
-                    processEvent(event)
+                    processHermesEvent(event)
                 }
             } catch (e: Exception) {
-                addError(e.message ?: "Stream error")
+                if (e !is kotlinx.coroutines.CancellationException) {
+                    addError(e.message ?: "Stream error")
+                }
             } finally {
-                _uiState.value = _uiState.value.copy(isStreaming = false)
+                _uiState.update { it.copy(isStreaming = false) }
                 coldStartJob?.cancel()
             }
         }
     }
 
-    fun interrupt() {
-        streamJob?.cancel()
-        streamJob = null
-        coldStartJob?.cancel()
-        viewModelScope.launch {
-            try {
-                repository.interruptSession(sessionId)
-            } catch (_: Exception) { }
-        }
-        val msgs = _uiState.value.messages.toMutableList()
-        // mark last assistant message as not streaming
-        for (i in msgs.indices.reversed()) {
-            if (msgs[i] is ChatItem.AssistantMessage) {
-                val msg = msgs[i] as ChatItem.AssistantMessage
-                msgs[i] = msg.copy(isStreaming = false)
-                break
-            }
-        }
-        _uiState.value = _uiState.value.copy(
-            messages = msgs,
-            isStreaming = false,
-            coldStartWarning = false,
-        )
-    }
-
-    fun respondClarify(id: String, response: String) {
-        viewModelScope.launch {
-            try {
-                repository.respondClarify(id, response)
-            } catch (_: Exception) { }
-        }
-        _uiState.value = _uiState.value.copy(clarifyRequest = null)
-    }
-
-    fun dismissClarify() {
-        _uiState.value = _uiState.value.copy(clarifyRequest = null)
-    }
-
-    fun respondApproval(id: String, approved: Boolean) {
-        viewModelScope.launch {
-            try {
-                repository.respondApproval(id, approved)
-            } catch (_: Exception) { }
-        }
-        _uiState.value = _uiState.value.copy(approvalRequest = null)
-    }
-
-    fun dismissApproval() {
-        _uiState.value = _uiState.value.copy(approvalRequest = null)
-    }
-
-    // ── Internal helpers ───────────────────────────────────────────────────
-
-    private fun startColdStartTimer() {
-        coldStartJob?.cancel()
-        coldStartJob = viewModelScope.launch {
-            delay(7_000)
-            if (_uiState.value.isStreaming) {
-                _uiState.value = _uiState.value.copy(coldStartWarning = true)
-            }
-        }
-    }
-
-    private fun processEvent(event: GatewayEvent) {
+    private fun processHermesEvent(event: GatewayEvent) {
         when (event) {
             is MessageStart -> {
                 coldStartJob?.cancel()
@@ -202,7 +233,6 @@ class ChatViewModel : ViewModel() {
                 appendToLastAssistant(text)
             }
             is MessageComplete -> {
-                // complete gives the full text; use it to replace the streaming text
                 val fullText = event.payload?.get("text")?.jsonPrimitive?.contentOrNull ?: ""
                 val msgs = _uiState.value.messages.toMutableList()
                 for (i in msgs.indices.reversed()) {
@@ -212,10 +242,7 @@ class ChatViewModel : ViewModel() {
                         break
                     }
                 }
-                _uiState.value = _uiState.value.copy(
-                    messages = msgs,
-                    isStreaming = false,
-                )
+                _uiState.value = _uiState.value.copy(messages = msgs, isStreaming = false)
                 coldStartJob?.cancel()
             }
             is ThinkingDelta -> {
@@ -256,7 +283,6 @@ class ChatViewModel : ViewModel() {
                 val summary = event.payload?.get("summary")?.jsonPrimitive?.contentOrNull
                 val resultRaw = event.payload?.get("result")?.toString()
                 val msgs = _uiState.value.messages.toMutableList()
-                // update the last RUNNING tool card for this name
                 for (i in msgs.indices.reversed()) {
                     if (msgs[i] is ChatItem.ToolCallCard) {
                         val card = msgs[i] as ChatItem.ToolCallCard
@@ -303,28 +329,155 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    private fun addMessage(item: ChatItem) {
-        _uiState.value = _uiState.value.copy(
-            messages = _uiState.value.messages + item,
+    // ── Direct API mode ─────────────────────────────────────────────────
+
+    private fun startDirectPrompt(text: String) {
+        val cfg = _uiState.value
+
+        addMessage(ChatItem.AssistantMessage(text = "", isStreaming = true))
+
+        streamJob = directApi.sendMessage(
+            text = text,
+            baseUrl = cfg.apiBaseUrl,
+            apiKey = cfg.apiKey,
+            model = cfg.apiModel,
+            temperature = cfg.temperature,
+            maxTokens = cfg.maxTokens,
+            systemPrompt = cfg.systemPrompt,
+            onDelta = { token ->
+                viewModelScope.launch {
+                    appendToLastAssistant(token)
+                }
+            },
+            onComplete = { fullText ->
+                viewModelScope.launch {
+                    val msgs = _uiState.value.messages.toMutableList()
+                    for (i in msgs.indices.reversed()) {
+                        if (msgs[i] is ChatItem.AssistantMessage) {
+                            val msg = msgs[i] as ChatItem.AssistantMessage
+                            msgs[i] = msg.copy(text = fullText, isStreaming = false)
+                            break
+                        }
+                    }
+                    _uiState.value = _uiState.value.copy(messages = msgs, isStreaming = false)
+                }
+            },
+            onError = { errorMsg ->
+                viewModelScope.launch {
+                    addError(errorMsg)
+                }
+            },
         )
+    }
+
+    // ── Shared actions ──────────────────────────────────────────────────
+
+    fun interrupt() {
+        streamJob?.cancel()
+        streamJob = null
+        coldStartJob?.cancel()
+
+        if (_uiState.value.chatMode == ChatMode.HERMES) {
+            viewModelScope.launch {
+                try {
+                    repository.interruptSession(sessionId)
+                } catch (e: Exception) {
+                    // Session interrupt failure is non-critical
+                }
+            }
+        } else {
+            directApi.interrupt()
+        }
+
+        _uiState.update { state ->
+            val msgs = state.messages.toMutableList()
+            for (i in msgs.indices.reversed()) {
+                if (msgs[i] is ChatItem.AssistantMessage) {
+                    val msg = msgs[i] as ChatItem.AssistantMessage
+                    msgs[i] = msg.copy(isStreaming = false)
+                    break
+                }
+            }
+            state.copy(messages = msgs, isStreaming = false, coldStartWarning = false)
+        }
+    }
+
+    fun newDirectSession() {
+        directApi.clearHistory()
+        _uiState.value = _uiState.value.copy(
+            messages = emptyList(),
+            isStreaming = false,
+        )
+    }
+
+    fun respondClarify(id: String, response: String) {
+        viewModelScope.launch {
+            try {
+                repository.respondClarify(id, response)
+            } catch (e: Exception) {
+                addError("Failed to send clarification: ${e.message}")
+            }
+        }
+        _uiState.update { it.copy(clarifyRequest = null) }
+    }
+
+    fun dismissClarify() {
+        _uiState.update { it.copy(clarifyRequest = null) }
+    }
+
+    fun respondApproval(id: String, approved: Boolean) {
+        viewModelScope.launch {
+            try {
+                repository.respondApproval(id, approved)
+            } catch (e: Exception) {
+                addError("Failed to respond approval: ${e.message}")
+            }
+        }
+        _uiState.update { it.copy(approvalRequest = null) }
+    }
+
+    fun dismissApproval() {
+        _uiState.update { it.copy(approvalRequest = null) }
+    }
+
+    // ── Internal helpers ───────────────────────────────────────────────────
+
+    private fun startColdStartTimer() {
+        coldStartJob?.cancel()
+        coldStartJob = viewModelScope.launch {
+            delay(7_000)
+            _uiState.update { state ->
+                if (state.isStreaming) state.copy(coldStartWarning = true) else state
+            }
+        }
+    }
+
+    private fun addMessage(item: ChatItem) {
+        _uiState.update { state ->
+            state.copy(messages = state.messages + item)
+        }
     }
 
     private fun addError(message: String) {
         addMessage(ChatItem.ErrorItem(message = message, isColdStart = false))
-        _uiState.value = _uiState.value.copy(isStreaming = false)
+        _uiState.update { state ->
+            state.copy(isStreaming = false, coldStartWarning = false)
+        }
         coldStartJob?.cancel()
     }
 
     private fun appendToLastAssistant(text: String) {
-        val msgs = _uiState.value.messages.toMutableList()
-        for (i in msgs.indices.reversed()) {
-            if (msgs[i] is ChatItem.AssistantMessage) {
-                val msg = msgs[i] as ChatItem.AssistantMessage
-                msgs[i] = msg.copy(text = msg.text + text)
-                break
+        _uiState.update { state ->
+            val msgs = state.messages.toMutableList()
+            for (i in msgs.indices.reversed()) {
+                if (msgs[i] is ChatItem.AssistantMessage) {
+                    val msg = msgs[i] as ChatItem.AssistantMessage
+                    msgs[i] = msg.copy(text = msg.text + text)
+                    break
+                }
             }
+            state.copy(messages = msgs)
         }
-        _uiState.value = _uiState.value.copy(messages = msgs)
     }
 
     override fun onCleared() {

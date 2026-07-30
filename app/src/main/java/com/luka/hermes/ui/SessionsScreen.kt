@@ -25,8 +25,11 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -47,10 +50,12 @@ import com.luka.hermes.gateway.Session
 fun SessionsScreen(
     viewModel: SessionsViewModel,
     onSessionSelected: (String) -> Unit,
+    onDirectChat: () -> Unit,
     onSettings: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showDeleteDialog by remember { mutableStateOf<Session?>(null) }
+    var showRenameDialog by remember { mutableStateOf<Session?>(null) }
 
     Scaffold(
         topBar = {
@@ -123,11 +128,46 @@ fun SessionsScreen(
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
+                        // Direct API chat entry
+                        item(key = "direct_chat") {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .combinedClickable(onClick = onDirectChat),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                ),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = "⚡",
+                                        style = MaterialTheme.typography.titleLarge,
+                                    )
+                                    Spacer(Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = "Direct API Chat",
+                                            style = MaterialTheme.typography.titleMedium,
+                                        )
+                                        Text(
+                                            text = "Chat without Hermes daemon",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                         items(uiState.sessions, key = { it.id }) { session ->
                             SessionCard(
                                 session = session,
                                 onClick = { onSessionSelected(session.id) },
-                                onLongClick = { showDeleteDialog = session },
+                                onRenameClick = { showRenameDialog = session },
+                                onDeleteClick = { showDeleteDialog = session },
                             )
                         }
                     }
@@ -159,6 +199,41 @@ fun SessionsScreen(
             },
         )
     }
+
+    // Rename dialog
+    showRenameDialog?.let { session ->
+        var newTitle by remember(session.id) { mutableStateOf(session.title ?: "") }
+        AlertDialog(
+            onDismissRequest = { showRenameDialog = null },
+            title = { Text("Rename Session") },
+            text = {
+                OutlinedTextField(
+                    value = newTitle,
+                    onValueChange = { newTitle = it },
+                    label = { Text("New title") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (newTitle.isNotBlank()) {
+                            viewModel.renameSession(session.id, newTitle.trim())
+                        }
+                        showRenameDialog = null
+                    },
+                ) {
+                    Text("Rename")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameDialog = null }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -166,14 +241,17 @@ fun SessionsScreen(
 private fun SessionCard(
     session: Session,
     onClick: () -> Unit,
-    onLongClick: () -> Unit,
+    onRenameClick: () -> Unit,
+    onDeleteClick: () -> Unit,
 ) {
+    var showMenu by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = onLongClick,
+                onLongClick = { showMenu = true },
             ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
@@ -202,6 +280,27 @@ private fun SessionCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+
+        // Context menu
+        DropdownMenu(
+            expanded = showMenu,
+            onDismissRequest = { showMenu = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text("Rename") },
+                onClick = {
+                    showMenu = false
+                    onRenameClick()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                onClick = {
+                    showMenu = false
+                    onDeleteClick()
+                },
+            )
         }
     }
 }

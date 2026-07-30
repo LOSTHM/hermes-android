@@ -7,16 +7,16 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.luka.hermes.ui.HermesTheme
 import com.luka.hermes.ui.HermesNavHost
+import com.luka.hermes.ui.HermesTheme
 import com.luka.hermes.ui.SettingsKeys
+import com.luka.hermes.ui.ThemeMode
 import com.luka.hermes.ui.settingsDataStore
 import kotlinx.coroutines.flow.first
 
@@ -27,29 +27,39 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
-            HermesTheme {
-                var ready by remember { mutableStateOf(false) }
-                var hasToken by remember { mutableStateOf(false) }
+            var ready by remember { mutableStateOf(false) }
+            var initialRoute by remember { mutableStateOf("settings") }
+            var themeMode by remember { mutableStateOf(ThemeMode.SYSTEM) }
 
-                // Read token from DataStore on first composition
-                androidx.compose.runtime.LaunchedEffect(Unit) {
-                    val prefs = applicationContext.settingsDataStore.data.first()
-                    val token = prefs[SettingsKeys.TOKEN] ?: ""
-                    hasToken = token.isNotBlank()
-                    ready = true
+            // Read settings on first composition
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                val prefs = applicationContext.settingsDataStore.data.first()
+                val token = prefs[SettingsKeys.TOKEN] ?: ""
+                val apiKey = prefs[SettingsKeys.API_KEY] ?: ""
+                val mode = prefs[SettingsKeys.CHAT_MODE] ?: "hermes"
+                val theme = prefs[SettingsKeys.THEME_MODE] ?: "SYSTEM"
+
+                themeMode = try { ThemeMode.valueOf(theme) } catch (_: Exception) { ThemeMode.SYSTEM }
+                initialRoute = when {
+                    mode == "direct" && apiKey.isNotBlank() -> "sessions"
+                    token.isNotBlank() -> "sessions"
+                    else -> "settings"
                 }
+                ready = true
+            }
 
-                if (!ready) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        CircularProgressIndicator()
-                    }
-                } else {
+            if (!ready) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                HermesTheme(themeMode = themeMode) {
                     HermesNavHost(
-                        initialRoute = if (hasToken) "sessions" else "settings",
-                        tokenConfigured = hasToken,
+                        initialRoute = initialRoute,
+                        tokenConfigured = initialRoute == "sessions",
                     )
                 }
             }

@@ -110,6 +110,19 @@ class HermesRepository(
         )
     }
 
+    /**
+     * Rename a session.
+     */
+    suspend fun renameSession(sessionId: String, newTitle: String) {
+        client.request(
+            RpcMethods.SESSION_TITLE,
+            buildJsonObject {
+                put("session_id", JsonPrimitive(sessionId))
+                put("title", JsonPrimitive(newTitle))
+            },
+        )
+    }
+
     // ── Prompting ─────────────────────────────────────────────────────────
 
     /**
@@ -213,6 +226,14 @@ class HermesRepository(
     }
 
     // ── Session actions ───────────────────────────────────────────────────
+
+    /** Load history messages for a session. Returns a JSON array of {role, content} objects. */
+    suspend fun getSessionHistory(sessionId: String): JsonElement {
+        return client.request(
+            RpcMethods.SESSION_HISTORY,
+            buildJsonObject { put("session_id", JsonPrimitive(sessionId)) },
+        )
+    }
 
     /** Interrupt the current generation in the given session. */
     suspend fun interruptSession(sessionId: String) {

@@ -9,4 +9,5 @@ local.properties
 .cxx/
 # secrets
 serve.log
+*.env
 __pycache__/

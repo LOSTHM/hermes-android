@@ -60,6 +60,19 @@ class SessionsViewModel : ViewModel() {
         }
     }
 
+    fun renameSession(sessionId: String, newTitle: String) {
+        viewModelScope.launch {
+            try {
+                repository.renameSession(sessionId, newTitle)
+                loadSessions()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Failed to rename session",
+                )
+            }
+        }
+    }
+
     fun deleteSession(sessionId: String) {
         viewModelScope.launch {
             try {

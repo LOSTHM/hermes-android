@@ -1,21 +1,30 @@
 package com.luka.hermes.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -23,47 +32,66 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.luka.hermes.gateway.ConnectionState
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 fun ChatScreen(
-    sessionId: String,
+    sessionId: String?,
     viewModel: ChatViewModel,
     onBack: () -> Unit,
 ) {
     LaunchedEffect(sessionId) {
-        viewModel.setSession(sessionId)
+        if (sessionId != null) {
+            viewModel.setSession(sessionId)
+        }
     }
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
-    // Auto-scroll to bottom when new messages arrive
+    // Track if user is near the bottom for auto-scroll + FAB visibility
+    val isAtBottom by remember {
+        derivedStateOf {
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val totalItems = listState.layoutInfo.totalItemsCount
+            lastVisible >= totalItems - 3
+        }
+    }
+
+    // Auto-scroll to bottom when new messages arrive (if already near bottom)
     LaunchedEffect(uiState.messages.size, uiState.messages.lastOrNull()?.let {
         if (it is ChatItem.AssistantMessage) it.text.length else 0
     }) {
-        if (uiState.messages.isNotEmpty()) {
+        if (uiState.messages.isNotEmpty() && isAtBottom) {
             listState.animateScrollToItem(uiState.messages.size - 1)
         }
     }
@@ -73,17 +101,36 @@ fun ChatScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        ConnectionDot(uiState.connectionState)
-                        Spacer(Modifier.width(8.dp))
+                        if (uiState.chatMode == ChatMode.HERMES) {
+                            ConnectionDot(uiState.connectionState)
+                            Spacer(Modifier.width(8.dp))
+                        }
                         Text(
-                            text = "Chat",
+                            text = if (uiState.chatMode == ChatMode.DIRECT)
+                                uiState.apiModel.ifEmpty { "Direct" }
+                            else "Chat",
                             style = MaterialTheme.typography.titleMedium,
                         )
+                        if (uiState.chatMode == ChatMode.DIRECT) {
+                            Spacer(Modifier.width(6.dp))
+                            AssistChip(
+                                onClick = {},
+                                label = { Text("API", fontSize = 10.sp) },
+                                modifier = Modifier.height(24.dp),
+                            )
+                        }
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    if (uiState.chatMode == ChatMode.DIRECT) {
+                        IconButton(onClick = { viewModel.newDirectSession() }) {
+                            Icon(Icons.Default.Add, contentDescription = "New Chat")
+                        }
                     }
                 },
             )
@@ -109,7 +156,9 @@ fun ChatScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "Send a message to start.",
+                        text = if (uiState.chatMode == ChatMode.DIRECT)
+                            "Direct API mode. Send a message to start."
+                        else "Send a message to start.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -121,20 +170,56 @@ fun ChatScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                contentPadding = PaddingValues(bottom = 4.dp),
             ) {
                 items(uiState.messages, key = { it.stableId }) { item ->
-                    when (item) {
-                        is ChatItem.UserMessage -> UserBubble(item.text)
-                        is ChatItem.AssistantMessage -> AssistantBubble(item)
-                        is ChatItem.ToolCallCard -> ToolCallCardView(item)
-                        is ChatItem.ThinkingBlock -> ThinkingBlockView(item)
-                        is ChatItem.ErrorItem -> ErrorBubble(item)
+                    AnimatedVisibility(
+                        visible = true,
+                        enter = fadeIn(animationSpec = tween(300)) +
+                            slideInVertically(animationSpec = tween(300)) { it / 2 },
+                    ) {
+                        when (item) {
+                            is ChatItem.UserMessage -> UserBubble(item, context)
+                            is ChatItem.AssistantMessage -> AssistantBubble(item, context)
+                            is ChatItem.ToolCallCard -> ToolCallCardView(item)
+                            is ChatItem.ThinkingBlock -> ThinkingBlockView(item)
+                            is ChatItem.ErrorItem -> ErrorBubble(item)
+                        }
+                    }
+                }
+
+                // Streaming cursor item
+                if (uiState.isStreaming) {
+                    item(key = "streaming_cursor") {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp, vertical = 2.dp),
+                            horizontalArrangement = Arrangement.Start,
+                        ) {
+                            StreamingCursor(isStreaming = true)
+                        }
                     }
                 }
             }
 
-            // Cold start warning overlay
+            // Scroll-to-bottom FAB
+            if (!isAtBottom && uiState.messages.size > 5) {
+                ScrollToBottomFAB(
+                    visible = true,
+                    onClick = {
+                        scope.launch {
+                            listState.animateScrollToItem(uiState.messages.size - 1)
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 16.dp),
+                )
+            }
+
+            // Cold start warning
             if (uiState.coldStartWarning) {
                 Card(
                     modifier = Modifier
@@ -265,8 +350,11 @@ private fun InputBar(
 
 // ── Message bubbles ───────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun UserBubble(text: String) {
+private fun UserBubble(msg: ChatItem.UserMessage, context: Context) {
+    var showMenu by remember { mutableStateOf(false) }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.End,
@@ -276,16 +364,55 @@ private fun UserBubble(text: String) {
             color = MaterialTheme.colorScheme.primaryContainer,
             modifier = Modifier.widthIn(max = 320.dp),
         ) {
-            SimpleMarkdownText(
-                text = text,
-                modifier = Modifier.padding(12.dp),
-            )
+            Column {
+                RichMarkdownText(
+                    markdown = msg.text,
+                    modifier = Modifier
+                        .padding(12.dp)
+                        .combinedClickable(
+                            onClick = {},
+                            onLongClick = { showMenu = true },
+                        ),
+                )
+                // Timestamp row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 12.dp, end = 12.dp, bottom = 4.dp),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TimeDisplay(
+                        epochMillis = msg.timestamp,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
+
+            // Context menu (DropdownMenu)
+            DropdownMenu(
+                expanded = showMenu,
+                onDismissRequest = { showMenu = false },
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Copy") },
+                    onClick = {
+                        showMenu = false
+                        copyToClipboard(context, msg.text)
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                    },
+                )
+            }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AssistantBubble(msg: ChatItem.AssistantMessage) {
+private fun AssistantBubble(msg: ChatItem.AssistantMessage, context: Context) {
+    var showMenu by remember { mutableStateOf(false) }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Start,
@@ -296,17 +423,58 @@ private fun AssistantBubble(msg: ChatItem.AssistantMessage) {
             modifier = Modifier.widthIn(max = 320.dp),
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
-                SimpleMarkdownText(text = msg.text)
-                if (msg.isStreaming) {
-                    val dots = when {
-                        msg.text.isEmpty() -> "●"
-                        msg.text.endsWith("\n") -> "..."
-                        else -> " ●"
+                RichMarkdownText(
+                    markdown = msg.text,
+                    modifier = Modifier.combinedClickable(
+                        onClick = {},
+                        onLongClick = { showMenu = true },
+                    ),
+                )
+
+                Spacer(Modifier.height(4.dp))
+
+                // Timestamp + streaming indicator
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (msg.isStreaming) {
+                        StreamingCursor(isStreaming = true)
+                    } else {
+                        Spacer(Modifier.size(4.dp))
                     }
-                    Text(
-                        text = dots,
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.bodyMedium,
+                    TimeDisplay(
+                        epochMillis = msg.timestamp,
+                    )
+                }
+            }
+
+            // Context menu
+            DropdownMenu(
+                expanded = showMenu,
+                onDismissRequest = { showMenu = false },
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Copy") },
+                    onClick = {
+                        showMenu = false
+                        copyToClipboard(context, msg.text)
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                    },
+                )
+                if (!msg.isStreaming) {
+                    DropdownMenuItem(
+                        text = { Text("Regenerate") },
+                        onClick = {
+                            showMenu = false
+                            // The user can long-press to retry — handled via regenerate in VM
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                        },
                     )
                 }
             }
@@ -332,8 +500,8 @@ private fun ToolCallCardView(card: ChatItem.ToolCallCard) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val icon = when (card.status) {
-                    ToolStatus.Running -> "\u2699\uFE0F" // gear
-                    ToolStatus.Complete -> "\u2705"       // check
+                    ToolStatus.Running -> "\u2699\uFE0F"
+                    ToolStatus.Complete -> "\u2705"
                 }
                 Text(text = icon, fontSize = 14.sp)
                 Spacer(Modifier.width(8.dp))
@@ -372,10 +540,7 @@ private fun ToolCallCardView(card: ChatItem.ToolCallCard) {
             AnimatedVisibility(visible = expanded) {
                 Column(modifier = Modifier.padding(top = 8.dp)) {
                     if (card.args != null) {
-                        Text(
-                            text = "Args:",
-                            style = MaterialTheme.typography.labelSmall,
-                        )
+                        Text(text = "Args:", style = MaterialTheme.typography.labelSmall)
                         Surface(
                             color = MaterialTheme.colorScheme.surface,
                             shape = RoundedCornerShape(4.dp),
@@ -391,10 +556,7 @@ private fun ToolCallCardView(card: ChatItem.ToolCallCard) {
                     }
                     if (card.result != null) {
                         Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = "Result:",
-                            style = MaterialTheme.typography.labelSmall,
-                        )
+                        Text(text = "Result:", style = MaterialTheme.typography.labelSmall)
                         Surface(
                             color = MaterialTheme.colorScheme.surface,
                             shape = RoundedCornerShape(4.dp),
@@ -433,15 +595,9 @@ private fun ThinkingBlockView(block: ChatItem.ThinkingBlock) {
                     .clickable { expanded = !expanded },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = if (expanded) "\u25BC" else "\u25B6",
-                    fontSize = 12.sp,
-                )
+                Text(text = if (expanded) "\u25BC" else "\u25B6", fontSize = 12.sp)
                 Spacer(Modifier.width(6.dp))
-                Text(
-                    text = "\uD83E\uDD14 Reasoning",
-                    style = MaterialTheme.typography.labelMedium,
-                )
+                Text(text = "\uD83E\uDD14 Reasoning", style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.weight(1f))
                 Text(
                     text = "${block.text.length} chars",
@@ -453,9 +609,7 @@ private fun ThinkingBlockView(block: ChatItem.ThinkingBlock) {
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(4.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 ) {
                     Text(
                         text = block.text,
@@ -488,78 +642,9 @@ private fun ErrorBubble(item: ChatItem.ErrorItem) {
     }
 }
 
-// ── Minimal markdown text (code blocks only) ──────────────────────────────────
+// ── Clipboard helper ──────────────────────────────────────────────────────────
 
-@Composable
-private fun SimpleMarkdownText(
-    text: String,
-    modifier: Modifier = Modifier,
-) {
-    if (text.isEmpty()) return
-
-    val segments = remember(text) { parseCodeBlocks(text) }
-
-    Column(modifier = modifier) {
-        for (segment in segments) {
-            when (segment) {
-                is MarkdownSegment.Text -> {
-                    Text(
-                        text = segment.content,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                is MarkdownSegment.CodeBlock -> {
-                    Spacer(Modifier.height(4.dp))
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                        shape = RoundedCornerShape(6.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            text = segment.content,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(8.dp),
-                        )
-                    }
-                    Spacer(Modifier.height(4.dp))
-                }
-            }
-        }
-    }
-}
-
-private sealed class MarkdownSegment {
-    data class Text(val content: String) : MarkdownSegment()
-    data class CodeBlock(val content: String) : MarkdownSegment()
-}
-
-private fun parseCodeBlocks(text: String): List<MarkdownSegment> {
-    val segments = mutableListOf<MarkdownSegment>()
-    var remaining = text
-    while (true) {
-        val start = remaining.indexOf("```")
-        if (start == -1) {
-            if (remaining.isNotEmpty()) segments.add(MarkdownSegment.Text(remaining))
-            break
-        }
-        // text before the code block
-        if (start > 0) {
-            segments.add(MarkdownSegment.Text(remaining.substring(0, start)))
-        }
-        val afterStart = remaining.substring(start + 3)
-        val end = afterStart.indexOf("```")
-        if (end == -1) {
-            // unclosed backtick — treat rest as text
-            segments.add(MarkdownSegment.Text("```" + afterStart))
-            break
-        }
-        // extract code content, stripping optional language tag (first line)
-        val codeContent = afterStart.substring(0, end)
-        val codeLines = codeContent.split("\n", limit = 2)
-        val code = if (codeLines.size > 1) codeLines[1] else codeLines[0]
-        segments.add(MarkdownSegment.CodeBlock(code.trimEnd()))
-        remaining = afterStart.substring(end + 3)
-    }
-    return segments
+private fun copyToClipboard(context: Context, text: String) {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+    clipboard?.setPrimaryClip(ClipData.newPlainText("message", text))
 }
