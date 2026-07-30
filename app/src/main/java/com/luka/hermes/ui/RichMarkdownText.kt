@@ -21,7 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -348,7 +348,7 @@ private fun BlockquoteView(text: String) {
 
 @Composable
 private fun HorizontalRuleView() {
-    HorizontalDivider(
+    Divider(
         modifier = Modifier.padding(vertical = 8.dp),
         thickness = 1.dp,
         color = MaterialTheme.colorScheme.outlineVariant,
