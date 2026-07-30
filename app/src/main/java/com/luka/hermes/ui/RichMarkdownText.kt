@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -45,9 +46,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.text.HtmlCompat
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 
 /**
  * Full-featured markdown renderer for chat messages.
@@ -357,16 +355,17 @@ private fun HorizontalRuleView() {
 
 @Composable
 private fun InlineImageView(alt: String, url: String) {
-    AsyncImage(
-        model = ImageRequest.Builder(LocalContext.current)
-            .data(url)
-            .crossfade(true)
-            .build(),
-        contentDescription = alt,
+    val context = LocalContext.current
+    Text(
+        text = "[📷 $alt]($url)",
+        color = MaterialTheme.colorScheme.primary,
+        style = MaterialTheme.typography.bodySmall,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
-            .clip(RoundedCornerShape(8.dp)),
+            .padding(vertical = 4.dp)
+            .clickable {
+                copyToClipboard(context, url)
+            },
     )
 }
 
@@ -443,15 +442,19 @@ private fun parseInline(text: String) = buildAnnotatedString {
             }
         }
 
-        // Image: ![alt](url) — inline
+        // Image: ![alt](url) — inline (render as link text)
         if (c == '!' && i + 1 < n && text[i + 1] == '[') {
             val closeBracket = text.indexOf(']', i + 2)
             if (closeBracket != -1 && closeBracket + 1 < n && text[closeBracket + 1] == '(') {
                 val closeParen = text.indexOf(')', closeBracket + 2)
                 if (closeParen != -1) {
                     val alt = text.substring(i + 2, closeBracket)
-                    val url = text.substring(closeBracket + 2, closeParen)
-                    appendInlineContent("image", "$alt||$url")
+                    withStyle(SpanStyle(
+                        color = Color(0xFF1E88E5),
+                        textDecoration = TextDecoration.Underline,
+                    )) {
+                        append("📷 $alt")
+                    }
                     i = closeParen + 1
                     continue
                 }

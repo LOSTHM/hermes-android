@@ -3,6 +3,7 @@ package com.luka.hermes.ui
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,13 +19,16 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -70,9 +74,21 @@ fun SettingsScreen(
         Text(text = "Theme", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            SegmentedButton(selected = uiState.themeMode == ThemeMode.SYSTEM, onClick = { viewModel.updateThemeMode(ThemeMode.SYSTEM) }) { Text("System") }
-            SegmentedButton(selected = uiState.themeMode == ThemeMode.LIGHT, onClick = { viewModel.updateThemeMode(ThemeMode.LIGHT) }) { Text("Light") }
-            SegmentedButton(selected = uiState.themeMode == ThemeMode.DARK, onClick = { viewModel.updateThemeMode(ThemeMode.DARK) }) { Text("Dark") }
+            SegmentedButton(
+                selected = uiState.themeMode == ThemeMode.SYSTEM,
+                onClick = { viewModel.updateThemeMode(ThemeMode.SYSTEM) },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
+            ) { Text("System") }
+            SegmentedButton(
+                selected = uiState.themeMode == ThemeMode.LIGHT,
+                onClick = { viewModel.updateThemeMode(ThemeMode.LIGHT) },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
+            ) { Text("Light") }
+            SegmentedButton(
+                selected = uiState.themeMode == ThemeMode.DARK,
+                onClick = { viewModel.updateThemeMode(ThemeMode.DARK) },
+                shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+            ) { Text("Dark") }
         }
 
         Spacer(Modifier.height(24.dp))
@@ -81,8 +97,16 @@ fun SettingsScreen(
         Text(text = "Chat Mode", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            SegmentedButton(selected = uiState.chatMode == ChatMode.HERMES, onClick = { viewModel.updateChatMode(ChatMode.HERMES) }) { Text("Hermes") }
-            SegmentedButton(selected = uiState.chatMode == ChatMode.DIRECT, onClick = { viewModel.updateChatMode(ChatMode.DIRECT) }) { Text("Direct API") }
+            SegmentedButton(
+                selected = uiState.chatMode == ChatMode.HERMES,
+                onClick = { viewModel.updateChatMode(ChatMode.HERMES) },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+            ) { Text("Hermes") }
+            SegmentedButton(
+                selected = uiState.chatMode == ChatMode.DIRECT,
+                onClick = { viewModel.updateChatMode(ChatMode.DIRECT) },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+            ) { Text("Direct API") }
         }
 
         Spacer(Modifier.height(24.dp))
