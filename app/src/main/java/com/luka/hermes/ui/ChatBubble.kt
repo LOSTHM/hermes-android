@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -177,7 +178,7 @@ fun UserChatBubble(
     timestamp: Long,
     onCopy: (String) -> Unit,
     modifier: Modifier = Modifier,
-)
+) {
     val context = LocalContext.current
     var menuVisible by remember { mutableStateOf(false) }
     var toastVisible by remember { mutableStateOf(false) }
