@@ -371,6 +371,7 @@ private fun InlineImageView(alt: String, url: String) {
 
 // ── Inline parser (bold, italic, code, links, images) ──────────────────────────
 
+@Composable
 private fun parseInline(text: String) = buildAnnotatedString {
     var i = 0
     val n = text.length
