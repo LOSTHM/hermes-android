@@ -73,4 +73,7 @@ object RpcMethods {
 
     // ── Agents ───────────────────────────────────────────────────────────
     const val AGENTS_LIST = "agents.list"
+
+    // ── Projects ─────────────────────────────────────────────────────────
+    const val PROJECTS_DISCOVER_REPOS = "projects.discover_repos"
 }

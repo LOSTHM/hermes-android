@@ -499,6 +499,19 @@ class HermesRepository(
         )
     }
 
+    // ── Projects ─────────────────────────────────────────────────────────
+
+    /**
+     * Discover git repositories for the projects overview.
+     *
+     * Calls the `projects.discover_repos` RPC.  Returns
+     * `{"repos": [...], "discovery_policy": {...}}` where each repo is
+     * `{root, label, sessions, last_active}`.
+     */
+    suspend fun discoverRepos(): JsonElement {
+        return client.request(RpcMethods.PROJECTS_DISCOVER_REPOS)
+    }
+
     // ── Internal: reconnect ───────────────────────────────────────────────
 
     private fun startReconnectLoop() {
