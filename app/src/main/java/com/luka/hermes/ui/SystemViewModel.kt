@@ -46,7 +46,7 @@ class SystemViewModel : ViewModel() {
             var processesError = false
             var system: JsonElement? = null
             var systemError = false
-            var config: JsonElement? = null
+            var config: List<JsonElement> = emptyList()
             var configError = false
             var models: List<JsonElement> = emptyList()
             var modelsError = false
