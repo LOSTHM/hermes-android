@@ -10,6 +10,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
@@ -55,11 +56,17 @@ object HermesRestClient {
     /**
      * Perform a GET against `http://127.0.0.1:9119/api/{path}`.
      *
+     * Query parameters are appended URL-encoded (e.g. `get("fs/list", mapOf("path" to "/"))`).
+     *
      * @throws HermesRestException on non-2xx responses (e.g. 401) or transport failures.
      */
-    suspend fun get(path: String): String = withContext(Dispatchers.IO) {
+    suspend fun get(path: String, queryParams: Map<String, String> = emptyMap()): String = withContext(Dispatchers.IO) {
+        val urlBuilder = toHttpUrlOrNull("$BASE_URL/$path")
+            ?: throw HermesRestException("Invalid URL for /api/$path")
+        queryParams.forEach { (key, value) -> urlBuilder.addQueryParameter(key, value) }
+
         val request = Request.Builder()
-            .url("$BASE_URL/$path")
+            .url(urlBuilder.build())
             .header("X-Hermes-Session-Token", sessionToken())
             .build()
 
@@ -78,8 +85,8 @@ object HermesRestClient {
      * Non-JSON bodies are wrapped in a [JsonPrimitive] and blank bodies become
      * [JsonNull] rather than throwing.
      */
-    suspend fun getJson(path: String): JsonElement {
-        val raw = get(path)
+    suspend fun getJson(path: String, queryParams: Map<String, String> = emptyMap()): JsonElement {
+        val raw = get(path, queryParams)
         if (raw.isBlank()) return JsonNull
         return try {
             json.parseToJsonElement(raw)
