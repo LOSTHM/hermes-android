@@ -120,7 +120,16 @@ class ChatViewModel : ViewModel() {
         )
         // Load session history in Hermes mode
         if (_uiState.value.chatMode == ChatMode.HERMES) {
-            loadSessionHistory(id)
+            viewModelScope.launch {
+                // Resume the session first so the daemon loads it from storage;
+                // session.history only works for sessions resident in its memory.
+                try {
+                    repository.resumeSession(id)
+                } catch (_: Exception) {
+                    // Silently degrade — resume failure must not block chatting.
+                }
+                loadSessionHistory(id)
+            }
         }
     }
 
@@ -156,6 +165,7 @@ class ChatViewModel : ViewModel() {
                         when (role) {
                             "user" -> items.add(ChatItem.UserMessage(content))
                             "assistant" -> items.add(ChatItem.AssistantMessage(content, false))
+                            "tool" -> { /* ignore tool messages */ }
                         }
                     }
                 }

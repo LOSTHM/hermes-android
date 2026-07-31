@@ -52,8 +52,8 @@ private fun parseSessionInstant(raw: String?): Instant? {
     return runCatching { Instant.parse(raw) }.getOrNull()
 }
 
-private fun bucketFor(updatedAt: String?, zone: ZoneId): SessionDateBucket {
-    val instant = parseSessionInstant(updatedAt) ?: return SessionDateBucket.EARLIER
+private fun bucketFor(startedAt: String?, zone: ZoneId): SessionDateBucket {
+    val instant = parseSessionInstant(startedAt) ?: return SessionDateBucket.EARLIER
     val today = LocalDate.now(zone)
     val sessionDate = instant.atZone(zone).toLocalDate()
     return when {
@@ -95,12 +95,12 @@ fun SessionsScreen(
         val zone = ZoneId.systemDefault()
         val ordered = filteredSessions.sortedByDescending {
             // Newest first; sessions with no parseable timestamp sink to the bottom
-            parseSessionInstant(it.updatedAt)?.toEpochMilli() ?: 0L
+            parseSessionInstant(it.startedAt)?.toEpochMilli() ?: 0L
         }
         buildList {
             var currentBucket: SessionDateBucket? = null
             ordered.forEach { session ->
-                val bucket = bucketFor(session.updatedAt, zone)
+                val bucket = bucketFor(session.startedAt, zone)
                 if (bucket != currentBucket) {
                     add(SessionListItem.Header(bucket))
                     currentBucket = bucket
@@ -420,7 +420,7 @@ private fun SessionCard(
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
-                    text = session.updatedAt ?: session.createdAt ?: "",
+                    text = session.startedAt ?: session.createdAt ?: "",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

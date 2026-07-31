@@ -17,6 +17,9 @@ import kotlinx.serialization.json.JsonObject
 data class Session(
     val id: String = "",
     val title: String? = null,
+    val preview: String? = null,
+    @SerialName("message_count") val messageCount: Int? = null,
+    @SerialName("started_at") val startedAt: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null,
     val status: String? = null,

@@ -227,6 +227,18 @@ class HermesRepository(
 
     // ── Session actions ───────────────────────────────────────────────────
 
+    /**
+     * Resume a session so the daemon loads it from storage into memory.
+     * Required before [getSessionHistory] returns history for a session that
+     * is not already resident in the daemon.
+     */
+    suspend fun resumeSession(sessionId: String): JsonElement {
+        return client.request(
+            RpcMethods.SESSION_RESUME,
+            buildJsonObject { put("session_id", JsonPrimitive(sessionId)) },
+        )
+    }
+
     /** Load history messages for a session. Returns a JSON array of {role, content} objects. */
     suspend fun getSessionHistory(sessionId: String): JsonElement {
         return client.request(
