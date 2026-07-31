@@ -318,8 +318,8 @@ class HermesRepository(
 
     /**
      * Resume a session so the daemon loads it from storage into memory.
-     * Required before [getSessionHistory] returns history for a session that
-     * is not already resident in the daemon.
+     * Primary source of chat history — the response carries the full message
+     * list under `result.messages` (entries: `{role, text, reasoning?, context?, name?}`).
      */
     suspend fun resumeSession(sessionId: String): JsonElement {
         return client.request(
@@ -328,7 +328,14 @@ class HermesRepository(
         )
     }
 
-    /** Load history messages for a session. Returns a JSON array of {role, content} objects. */
+    /**
+     * Load history messages for a session. Returns a JSON array of
+     * `{role, content}` objects.
+     *
+     * **Not reliable on `serve`** — `session.history` replies with error
+     * 4001 "session not found" even for resident sessions. Kept only as a
+     * fallback; [resumeSession] is the primary path for history.
+     */
     suspend fun getSessionHistory(sessionId: String): JsonElement {
         return client.request(
             RpcMethods.SESSION_HISTORY,

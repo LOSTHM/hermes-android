@@ -76,6 +76,10 @@ fun HermesNavHost(
                         NavigationBarItem(
                             selected = selected,
                             onClick = {
+                                // No-op when already on this tab — avoids
+                                // redundant stack manipulation (jank/duplicate
+                                // pushes) while tab switching.
+                                if (selected) return@NavigationBarItem
                                 navController.navigate(item.route) {
                                     popUpTo(navController.graph.findStartDestination().id) {
                                         saveState = true

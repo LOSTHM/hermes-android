@@ -10,10 +10,15 @@ import kotlinx.serialization.json.JsonElement
 
 data class SystemUiState(
     val processes: List<JsonElement> = emptyList(),
+    val processesError: Boolean = false,
     val system: JsonElement? = null,
+    val systemError: Boolean = false,
     val config: JsonElement? = null,
+    val configError: Boolean = false,
     val models: List<JsonElement> = emptyList(),
+    val modelsError: Boolean = false,
     val usage: JsonElement? = null,
+    val usageError: Boolean = false,
     val loading: Boolean = false,
     val error: String? = null,
 )
@@ -36,32 +41,45 @@ class SystemViewModel : ViewModel() {
             val errors = mutableListOf<String>()
 
             var processes: List<JsonElement> = emptyList()
+            var processesError = false
             var system: JsonElement? = null
+            var systemError = false
             var config: JsonElement? = null
+            var configError = false
             var models: List<JsonElement> = emptyList()
+            var modelsError = false
             var usage: JsonElement? = null
+            var usageError = false
 
+            // Each call is guarded independently so one failing section
+            // (e.g. process.list → 4001 "session not found" on serve) can
+            // never block the rest of the page from rendering.
             try { processes = repository.listProcesses().toListItems() }
-            catch (e: Exception) { errors += e.message ?: "process.list failed" }
+            catch (e: Exception) { processesError = true; errors += e.message ?: "process.list failed" }
 
             try { system = repository.getSystemBattery() }
-            catch (e: Exception) { errors += e.message ?: "system.battery failed" }
+            catch (e: Exception) { systemError = true; errors += e.message ?: "system.battery failed" }
 
             try { config = repository.getConfigShow() }
-            catch (e: Exception) { errors += e.message ?: "config.show failed" }
+            catch (e: Exception) { configError = true; errors += e.message ?: "config.show failed" }
 
             try { models = repository.getModelOptions().toListItems() }
-            catch (e: Exception) { errors += e.message ?: "model.options failed" }
+            catch (e: Exception) { modelsError = true; errors += e.message ?: "model.options failed" }
 
             try { usage = repository.getUsageBars() }
-            catch (e: Exception) { errors += e.message ?: "usage.bars failed" }
+            catch (e: Exception) { usageError = true; errors += e.message ?: "usage.bars failed" }
 
             _uiState.value = _uiState.value.copy(
                 processes = processes,
+                processesError = processesError,
                 system = system,
+                systemError = systemError,
                 config = config,
+                configError = configError,
                 models = models,
+                modelsError = modelsError,
                 usage = usage,
+                usageError = usageError,
                 loading = false,
                 error = errors.takeIf { it.isNotEmpty() }?.joinToString(" · "),
             )

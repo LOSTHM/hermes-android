@@ -1,5 +1,6 @@
 package com.luka.hermes.ui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -7,9 +8,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -81,12 +87,46 @@ fun ToolsScreen(
                 Spacer(Modifier.height(16.dp))
             }
 
-            ToolsSectionCard("Cron Jobs", uiState.cronJobs, { it.optString("title", "name", "job", "id") }) { it.cronSubtitle() }
-            ToolsSectionCard("Skills", uiState.skills, { it.optString("name", "title", "id") }) { it.optString("description") }
-            ToolsSectionCard("Plugins", uiState.plugins, { it.optString("name", "title", "id") }) { it.optString("version") }
-            ToolsSectionCard("Agents", uiState.agents, { it.optString("name", "id") })
-            ToolsSectionCard("Tools", uiState.tools, { it.optString("name", "title", "id") })
-            ToolsSectionCard("Toolsets", uiState.toolsets, { it.optString("name", "title", "id") })
+            ToolsSectionCard(
+                title = "Cron Jobs",
+                items = uiState.cronJobs,
+                failed = uiState.cronJobsError,
+                initiallyExpanded = true,
+                titleOf = { it.optString("title", "name", "job", "id") },
+                subtitleOf = { it.cronSubtitle() },
+            )
+            ToolsSectionCard(
+                title = "Skills",
+                items = uiState.skills,
+                failed = uiState.skillsError,
+                titleOf = { it.optString("name", "title", "id") },
+                subtitleOf = { it.optString("description") },
+            )
+            ToolsSectionCard(
+                title = "Plugins",
+                items = uiState.plugins,
+                failed = uiState.pluginsError,
+                titleOf = { it.optString("name", "title", "id") },
+                subtitleOf = { it.optString("version") },
+            )
+            ToolsSectionCard(
+                title = "Agents",
+                items = uiState.agents,
+                failed = uiState.agentsError,
+                titleOf = { it.optString("name", "id") },
+            )
+            ToolsSectionCard(
+                title = "Tools",
+                items = uiState.tools,
+                failed = uiState.toolsError,
+                titleOf = { it.optString("name", "title", "id") },
+            )
+            ToolsSectionCard(
+                title = "Toolsets",
+                items = uiState.toolsets,
+                failed = uiState.toolsetsError,
+                titleOf = { it.optString("name", "title", "id") },
+            )
 
             AdvancedPanelsCard(
                 onOpenGit = onOpenGit,
@@ -105,46 +145,70 @@ fun ToolsScreen(
 private fun ToolsSectionCard(
     title: String,
     items: List<JsonElement>,
+    failed: Boolean = false,
+    initiallyExpanded: Boolean = false,
     titleOf: (JsonElement) -> String?,
     subtitleOf: (JsonElement) -> String? = { null },
 ) {
+    var expanded by remember { mutableStateOf(initiallyExpanded) }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(Modifier.height(8.dp))
-
-            if (items.isEmpty()) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
-                    text = "No items",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f),
                 )
-            } else {
-                items.forEach { item ->
-                    val name = titleOf(item) ?: "Unknown"
-                    val subtitle = subtitleOf(item)
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                        Text("•", color = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.width(8.dp))
-                        Column {
-                            Text(name, style = MaterialTheme.typography.bodyMedium)
-                            subtitle?.let {
-                                Text(
-                                    text = it,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            AnimatedVisibility(visible = expanded) {
+                Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
+                    when {
+                        failed -> Text(
+                            text = "Failed to load",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        items.isEmpty() -> Text(
+                            text = "No items",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        else -> items.forEach { item ->
+                            val name = titleOf(item) ?: "Unknown"
+                            val subtitle = subtitleOf(item)
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                                Text("•", color = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.width(8.dp))
+                                Column {
+                                    Text(name, style = MaterialTheme.typography.bodyMedium)
+                                    subtitle?.let {
+                                        Text(
+                                            text = it,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
                             }
+                            Spacer(Modifier.height(6.dp))
                         }
                     }
-                    Spacer(Modifier.height(6.dp))
                 }
             }
         }

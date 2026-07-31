@@ -130,16 +130,11 @@ class ChatViewModel : ViewModel() {
             terminalRequest = null,
             coldStartWarning = false,
         )
-        // Load session history in Hermes mode
+        // Load session history in Hermes mode. resumeSession is the primary
+        // path — it returns the full message list; session.history replies
+        // "session not found" for non-resident sessions.
         if (_uiState.value.chatMode == ChatMode.HERMES) {
             viewModelScope.launch {
-                // Resume the session first so the daemon loads it from storage;
-                // session.history only works for sessions resident in its memory.
-                try {
-                    repository.resumeSession(id)
-                } catch (_: Exception) {
-                    // Silently degrade — resume failure must not block chatting.
-                }
                 loadSessionHistory(id)
             }
         }
@@ -162,30 +157,37 @@ class ChatViewModel : ViewModel() {
 
     /**
      * Load past messages for an existing Hermes session.
+     *
+     * Primary path is [HermesRepository.resumeSession]: its response carries
+     * the full message list as `result.messages`, each entry shaped like
+     * `{ role: "user"|"assistant"|"tool", text, reasoning?, context?, name? }`.
+     * The field is `text`, not `content` (kept as a fallback). Failures
+     * degrade silently to an empty history so chatting is never blocked.
      */
     private fun loadSessionHistory(sessionId: String) {
         viewModelScope.launch {
             try {
-                val result = repository.getSessionHistory(sessionId)
+                val result = repository.resumeSession(sessionId)
+                val messages = (result as? JsonObject)?.get("messages") as? JsonArray
+                    ?: return@launch
                 val items = mutableListOf<ChatItem>()
-                // Expects array of { role, content } objects
-                if (result is JsonArray) {
-                    for (entry in result) {
-                        val obj = entry.jsonObject
-                        val role = obj["role"]?.jsonPrimitive?.contentOrNull ?: continue
-                        val content = obj["content"]?.jsonPrimitive?.contentOrNull ?: ""
-                        when (role) {
-                            "user" -> items.add(ChatItem.UserMessage(content))
-                            "assistant" -> items.add(ChatItem.AssistantMessage(content, false))
-                            "tool" -> { /* ignore tool messages */ }
-                        }
+                for (entry in messages) {
+                    val obj = entry as? JsonObject ?: continue
+                    val role = obj["role"]?.jsonPrimitive?.contentOrNull ?: continue
+                    val text = obj["text"]?.jsonPrimitive?.contentOrNull
+                        ?: obj["content"]?.jsonPrimitive?.contentOrNull
+                        ?: ""
+                    when (role) {
+                        "user" -> items.add(ChatItem.UserMessage(text))
+                        "assistant" -> items.add(ChatItem.AssistantMessage(text, false))
+                        "tool" -> { /* ignore tool messages */ }
                     }
                 }
                 if (items.isNotEmpty()) {
                     _uiState.value = _uiState.value.copy(messages = items)
                 }
             } catch (_: Exception) {
-                // Silently ignore history load errors (fresh session, etc.)
+                // Silently ignore history load errors — resume is best-effort.
             }
         }
     }

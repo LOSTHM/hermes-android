@@ -82,7 +82,9 @@ fun SystemScreen(
 
             // ── Processes ─────────────────────────────────────────────
             SectionCard("Processes") {
-                if (uiState.processes.isEmpty()) {
+                if (uiState.processesError) {
+                    Unavailable("process.list unavailable")
+                } else if (uiState.processes.isEmpty()) {
                     NoData()
                 } else {
                     uiState.processes.forEach { proc ->
@@ -261,6 +263,15 @@ private fun NoData() {
         text = "No data",
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun Unavailable(reason: String) {
+    Text(
+        text = "Unavailable · $reason",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.error,
     )
 }
 
