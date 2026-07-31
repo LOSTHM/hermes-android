@@ -183,8 +183,18 @@ fun ChatScreen(
                             slideInVertically(animationSpec = tween(300)) { it / 2 },
                     ) {
                         when (item) {
-                            is ChatItem.UserMessage -> UserBubble(item, context)
-                            is ChatItem.AssistantMessage -> AssistantBubble(item, context)
+                            is ChatItem.UserMessage -> UserChatBubble(
+                                text = item.text,
+                                timestamp = item.timestamp,
+                                onCopy = { copyToClipboard(context, item.text) },
+                            )
+                            is ChatItem.AssistantMessage -> AssistantChatBubble(
+                                text = item.text,
+                                timestamp = item.timestamp,
+                                isStreaming = item.isStreaming,
+                                onCopy = { copyToClipboard(context, item.text) },
+                                onRegenerate = { viewModel.regenerateLast() },
+                            )
                             is ChatItem.ToolCallCard -> ToolCallCardView(item)
                             is ChatItem.ThinkingBlock -> ThinkingBlockView(item)
                             is ChatItem.ErrorItem -> ErrorBubble(item)
