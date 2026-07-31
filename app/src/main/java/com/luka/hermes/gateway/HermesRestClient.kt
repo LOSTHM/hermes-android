@@ -61,8 +61,9 @@ object HermesRestClient {
      * @throws HermesRestException on non-2xx responses (e.g. 401) or transport failures.
      */
     suspend fun get(path: String, queryParams: Map<String, String> = emptyMap()): String = withContext(Dispatchers.IO) {
-        val urlBuilder = toHttpUrlOrNull("$BASE_URL/$path")
+        val url = toHttpUrlOrNull("$BASE_URL/$path")
             ?: throw HermesRestException("Invalid URL for /api/$path")
+        val urlBuilder = url.newBuilder()
         queryParams.forEach { (key, value) -> urlBuilder.addQueryParameter(key, value) }
 
         val request = Request.Builder()
