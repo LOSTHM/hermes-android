@@ -166,6 +166,56 @@ fun HermesNavHost(
                 ToolsScreen(
                     viewModel = toolsViewModel,
                     onBack = { navController.popBackStack() },
+                    onOpenGit = { navController.navigate("git") },
+                    onOpenFiles = { navController.navigate("files") },
+                    onOpenMcp = { navController.navigate("mcp") },
+                    onOpenProfiles = { navController.navigate("profiles") },
+                    onOpenLearning = { navController.navigate("learning") },
+                )
+            }
+
+            // Git
+            composable("git") {
+                val gitViewModel: GitViewModel = viewModel()
+                GitScreen(
+                    viewModel = gitViewModel,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            // Files
+            composable("files") {
+                val filesViewModel: FilesViewModel = viewModel()
+                FilesScreen(
+                    viewModel = filesViewModel,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            // MCP Servers
+            composable("mcp") {
+                val mcpViewModel: McpViewModel = viewModel()
+                McpScreen(
+                    viewModel = mcpViewModel,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            // Profiles
+            composable("profiles") {
+                val profilesViewModel: ProfilesViewModel = viewModel()
+                ProfilesScreen(
+                    viewModel = profilesViewModel,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            // Learning
+            composable("learning") {
+                val learningViewModel: LearningViewModel = viewModel()
+                LearningScreen(
+                    viewModel = learningViewModel,
+                    onBack = { navController.popBackStack() },
                 )
             }
 

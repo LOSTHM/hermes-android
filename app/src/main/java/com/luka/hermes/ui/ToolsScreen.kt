@@ -1,9 +1,11 @@
 package com.luka.hermes.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -19,6 +21,11 @@ import kotlinx.serialization.json.JsonElement
 fun ToolsScreen(
     viewModel: ToolsViewModel,
     onBack: () -> Unit,
+    onOpenGit: () -> Unit = {},
+    onOpenFiles: () -> Unit = {},
+    onOpenMcp: () -> Unit = {},
+    onOpenProfiles: () -> Unit = {},
+    onOpenLearning: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -81,6 +88,14 @@ fun ToolsScreen(
             ToolsSectionCard("Tools", uiState.tools, { it.optString("name", "title", "id") })
             ToolsSectionCard("Toolsets", uiState.toolsets, { it.optString("name", "title", "id") })
 
+            AdvancedPanelsCard(
+                onOpenGit = onOpenGit,
+                onOpenFiles = onOpenFiles,
+                onOpenMcp = onOpenMcp,
+                onOpenProfiles = onOpenProfiles,
+                onOpenLearning = onOpenLearning,
+            )
+
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -135,6 +150,55 @@ private fun ToolsSectionCard(
         }
     }
     Spacer(Modifier.height(12.dp))
+}
+
+@Composable
+private fun AdvancedPanelsCard(
+    onOpenGit: () -> Unit,
+    onOpenFiles: () -> Unit,
+    onOpenMcp: () -> Unit,
+    onOpenProfiles: () -> Unit,
+    onOpenLearning: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+    ) {
+        Column(modifier = Modifier.padding(vertical = 16.dp)) {
+            Text(
+                text = "Advanced Panels",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+            Spacer(Modifier.height(8.dp))
+
+            AdvancedPanelItem("Git", onOpenGit)
+            AdvancedPanelItem("Files", onOpenFiles)
+            AdvancedPanelItem("MCP Servers", onOpenMcp)
+            AdvancedPanelItem("Profiles", onOpenProfiles)
+            AdvancedPanelItem("Learning", onOpenLearning)
+        }
+    }
+    Spacer(Modifier.height(12.dp))
+}
+
+@Composable
+private fun AdvancedPanelItem(
+    label: String,
+    onClick: () -> Unit,
+) {
+    ListItem(
+        headlineContent = { Text(label, style = MaterialTheme.typography.bodyMedium) },
+        trailingContent = {
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        modifier = Modifier.clickable(onClick = onClick),
+    )
 }
 
 private fun JsonElement.cronSubtitle(): String? {
