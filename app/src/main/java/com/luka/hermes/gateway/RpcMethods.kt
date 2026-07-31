@@ -74,6 +74,10 @@ object RpcMethods {
     // ── Agents ───────────────────────────────────────────────────────────
     const val AGENTS_LIST = "agents.list"
 
+    // ── Spawn trees (delegated subagents) ────────────────────────────────
+    const val SPAWN_TREE_LIST = "spawn_tree.list"
+    const val SPAWN_TREE_LOAD = "spawn_tree.load"
+
     // ── Projects ─────────────────────────────────────────────────────────
     const val PROJECTS_DISCOVER_REPOS = "projects.discover_repos"
 }

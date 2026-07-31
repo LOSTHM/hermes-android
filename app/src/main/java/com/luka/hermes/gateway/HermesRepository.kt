@@ -428,6 +428,37 @@ class HermesRepository(
         return client.request(RpcMethods.AGENTS_LIST)
     }
 
+    // ── Spawn trees (delegated subagents) ────────────────────────────────
+
+    /**
+     * List recorded subagent spawn trees via `spawn_tree.list`.
+     *
+     * Cross-session scanning is enabled so trees from every session are
+     * returned; the server default (params `{}`) only reads the `default`
+     * session dir, which is typically empty.  Returns
+     * `{"entries": [{path, session_id, started_at, finished_at, label, count}]}`
+     * sorted newest-first.
+     */
+    suspend fun listSpawnTree(): JsonElement {
+        return client.request(
+            RpcMethods.SPAWN_TREE_LIST,
+            buildJsonObject { put("cross_session", JsonPrimitive(true)) },
+        )
+    }
+
+    /**
+     * Load a full spawn-tree snapshot via `spawn_tree.load`.
+     *
+     * @param path  The snapshot `path` from a [listSpawnTree] entry.
+     * @return The snapshot object `{session_id, started_at, finished_at, label, subagents: [...]}`.
+     */
+    suspend fun loadSpawnTree(path: String): JsonElement {
+        return client.request(
+            RpcMethods.SPAWN_TREE_LOAD,
+            buildJsonObject { put("path", JsonPrimitive(path)) },
+        )
+    }
+
     suspend fun listTools(): JsonElement {
         return client.request(RpcMethods.TOOLS_LIST)
     }
