@@ -10,8 +10,10 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
 /** Thrown for non-2xx REST responses (including 401 for an invalid/expired token). */
@@ -92,6 +94,28 @@ object HermesRestClient {
             json.parseToJsonElement(raw)
         } catch (_: Exception) {
             JsonPrimitive(raw)
+        }
+    }
+
+    /**
+     * Perform a POST against `http://127.0.0.1:9119/api/{path}` with a JSON body.
+     *
+     * @param body raw request body; sent as `application/json` (may be blank).
+     * @throws HermesRestException on non-2xx responses or transport failures.
+     */
+    suspend fun post(path: String, body: String = ""): String = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url("$BASE_URL/$path")
+            .header("X-Hermes-Session-Token", sessionToken())
+            .post(body.toRequestBody("application/json; charset=utf-8".toMediaType()))
+            .build()
+
+        httpClient.newCall(request).execute().use { response ->
+            val responseBody = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                throw HermesRestException("HTTP ${response.code} for /api/$path: $responseBody")
+            }
+            responseBody
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.luka.hermes.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -28,8 +29,20 @@ import kotlinx.serialization.json.contentOrNull
 fun GitScreen(
     viewModel: GitViewModel,
     onBack: () -> Unit,
+    onOpenDiff: (String) -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    var diffFile by remember { mutableStateOf<String?>(null) }
+    val openFile = diffFile
+    if (openFile != null) {
+        GitDiffScreen(
+            repoPath = uiState.repoPath,
+            filePath = openFile,
+            onBack = { diffFile = null },
+        )
+        return
+    }
 
     Scaffold(
         topBar = {
@@ -91,15 +104,32 @@ fun GitScreen(
                 if (element.isEmptyData()) {
                     GitNoData()
                 } else {
-                    val files = element.statusFiles()
+                    val files = element.statusFileRows()
                     if (files.isEmpty()) {
                         GitJsonSnippet(element)
                     } else {
-                        files.forEachIndexed { index, (marker, name) ->
-                            StatusFileRow(marker, name)
+                        files.forEachIndexed { index, file ->
+                            StatusFileRow(
+                                file = file,
+                                busy = uiState.stageBusy,
+                                onOpenDiff = { name ->
+                                    onOpenDiff(name)
+                                    diffFile = name
+                                },
+                                onStage = viewModel::stageFile,
+                                onUnstage = viewModel::unstageFile,
+                            )
                             if (index < files.lastIndex) {
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                             }
+                        }
+                        uiState.stageError?.let { stageError ->
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = stageError,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
                         }
                     }
                 }
@@ -225,7 +255,13 @@ private fun GitJsonSnippet(element: JsonElement) {
 }
 
 @Composable
-private fun StatusFileRow(marker: String, name: String) {
+private fun StatusFileRow(
+    file: GitFileRow,
+    busy: Boolean,
+    onOpenDiff: (String) -> Unit,
+    onStage: (String) -> Unit,
+    onUnstage: (String) -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -233,20 +269,48 @@ private fun StatusFileRow(marker: String, name: String) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = statusLabels[marker] ?: marker,
+            text = statusLabels[file.marker] ?: file.marker,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
-            color = statusMarkerColor(marker),
+            color = statusMarkerColor(file.marker),
             modifier = Modifier
                 .clip(MaterialTheme.shapes.small)
-                .background(statusMarkerColor(marker).copy(alpha = 0.12f))
+                .background(statusMarkerColor(file.marker).copy(alpha = 0.12f))
                 .padding(horizontal = 8.dp, vertical = 2.dp),
         )
         Spacer(Modifier.width(8.dp))
         Text(
-            text = name,
+            text = file.name,
             style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .clip(MaterialTheme.shapes.small)
+                .clickable { onOpenDiff(file.name) },
+        )
+        if (!file.staged) {
+            SmallActionButton(label = "Stage", enabled = !busy) { onStage(file.name) }
+        }
+        if (file.staged) {
+            SmallActionButton(label = "Unstage", enabled = !busy) { onUnstage(file.name) }
+        }
+    }
+}
+
+@Composable
+private fun SmallActionButton(
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    TextButton(
+        onClick = onClick,
+        enabled = enabled,
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
         )
     }
 }
@@ -260,6 +324,14 @@ private fun statusMarkerColor(marker: String): Color = when (marker) {
 }
 
 // ── Parsing helpers (best-effort over varying response shapes) ─────────────
+
+data class GitFileRow(
+    val marker: String,
+    val name: String,
+    val staged: Boolean = false,
+    val unstaged: Boolean = false,
+    val untracked: Boolean = false,
+)
 
 private val statusLabels = mapOf(
     "??" to "untracked",
@@ -280,7 +352,7 @@ private fun JsonElement?.isEmptyData(): Boolean {
     }
 }
 
-private fun JsonElement.statusFiles(): List<Pair<String, String>> {
+private fun JsonElement.statusFileRows(): List<GitFileRow> {
     val entries = when (this) {
         is JsonArray -> toList()
         is JsonObject -> listOf("files", "status", "changes", "entries", "items", "results", "data")
@@ -290,16 +362,45 @@ private fun JsonElement.statusFiles(): List<Pair<String, String>> {
     return entries.mapNotNull { entry ->
         when (entry) {
             is JsonPrimitive -> parseStatusLine(entry.contentOrNull ?: return@mapNotNull null)
+                ?.let { (marker, name) -> GitFileRow(marker = marker, name = name) }
             is JsonObject -> {
                 val name = entry.optString("path", "file", "name", "filename", "path_from_root", "value")
                     ?: return@mapNotNull null
-                val code = entry.optString("status", "state", "code", "index", "worktree", "change", "raw")
-                    ?: "M"
-                code to name
+                val staged = entry.boolValue("staged", "is_staged", "isStaged") == true
+                val unstaged = entry.boolValue("unstaged", "is_unstaged", "isUnstaged") == true
+                val untracked = entry.boolValue("untracked", "is_untracked", "isUntracked") == true
+                val conflicted = entry.boolValue("conflicted", "conflict", "is_conflicted") == true
+                val code = entry.optString("status", "state", "code", "raw")
+                val marker = when {
+                    code != null -> code
+                    untracked -> "??"
+                    conflicted -> "U"
+                    else -> "M"
+                }
+                GitFileRow(
+                    marker = marker,
+                    name = name,
+                    staged = staged,
+                    unstaged = unstaged,
+                    untracked = untracked,
+                )
             }
             else -> null
         }
     }
+}
+
+private fun JsonObject.boolValue(vararg keys: String): Boolean? {
+    for (key in keys) {
+        val el = this[key] ?: continue
+        if (el !is JsonPrimitive) return null
+        return when (val content = el.contentOrNull) {
+            "true", "1", "yes" -> true
+            "false", "0", "no", null -> false
+            else -> content.toBooleanStrictOrNull()
+        }
+    }
+    return null
 }
 
 private fun parseStatusLine(line: String): Pair<String, String>? {

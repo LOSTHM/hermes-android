@@ -180,6 +180,7 @@ fun HermesNavHost(
                 GitScreen(
                     viewModel = gitViewModel,
                     onBack = { navController.popBackStack() },
+                    onOpenDiff = {},
                 )
             }
 
