@@ -81,13 +81,18 @@ data class ChatUiState(
     val coldStartWarning: Boolean = false,
     val inputText: String = "",
     val chatMode: ChatMode = ChatMode.HERMES,
-    /** For DIRECT mode: base URL, key, model (from settings) */
+    /** For DIRECT mode: API configuration */
     val apiBaseUrl: String = "",
     val apiKey: String = "",
     val apiModel: String = "qwen3.6",
     val temperature: Float = 0.7f,
     val maxTokens: Int = 4096,
     val systemPrompt: String = "",
+    /** Attachment */
+    val attachedImageUri: String? = null,
+    /** Token usage */
+    val promptTokens: Int = 0,
+    val completionTokens: Int = 0,
 )
 
 // ── ViewModel ──────────────────────────────────────────────────────────────────
@@ -439,6 +444,66 @@ class ChatViewModel : ViewModel() {
 
     fun dismissApproval() {
         _uiState.update { it.copy(approvalRequest = null) }
+    }
+
+    /**
+     * Replace the user message at [index] with [newText].
+     * Trims following messages and re-sends.
+     */
+    fun editMessage(index: Int, newText: String) {
+        if (newText.isBlank()) return
+        _uiState.update { state ->
+            val msgs = state.messages.toMutableList()
+            if (index in msgs.indices && msgs[index] is ChatItem.UserMessage) {
+                msgs[index] = (msgs[index] as ChatItem.UserMessage).copy(text = newText)
+            }
+            state.copy(messages = msgs.take(index + 1), isStreaming = false)
+        }
+        _uiState.update { it.copy(inputText = newText) }
+        sendPrompt()
+    }
+
+    /**
+     * Remove the [ChatItem] at [index] from the message list.
+     */
+    fun deleteMessage(index: Int) {
+        _uiState.update { state ->
+            val msgs = state.messages.toMutableList()
+            if (index in msgs.indices) msgs.removeAt(index)
+            state.copy(messages = msgs)
+        }
+    }
+
+    /**
+     * Re-issue the last user prompt so the assistant regenerates a response.
+     */
+    fun regenerateLast() {
+        val msgs = _uiState.value.messages
+        val lastUserIdx = msgs.indexOfLast { it is ChatItem.UserMessage }
+        if (lastUserIdx < 0) return
+        val lastText = (msgs[lastUserIdx] as ChatItem.UserMessage).text
+        _uiState.update { state ->
+            state.copy(messages = state.messages.take(lastUserIdx + 1), isStreaming = false)
+        }
+        _uiState.update { it.copy(inputText = lastText) }
+        sendPrompt()
+    }
+
+    // ── Attachment helpers ─────────────────────────────────────────────────
+
+    /** Set the URI of an image picked from the gallery. */
+    fun attachImage(uri: android.net.Uri) {
+        _uiState.update { it.copy(attachedImageUri = uri.toString()) }
+    }
+
+    /** Clear the currently attached image. */
+    fun removeAttachment() {
+        _uiState.update { it.copy(attachedImageUri = null) }
+    }
+
+    /** Record token usage from the last response. */
+    fun recordTokenUsage(prompt: Int, completion: Int) {
+        _uiState.update { it.copy(promptTokens = prompt, completionTokens = completion) }
     }
 
     // ── Internal helpers ───────────────────────────────────────────────────

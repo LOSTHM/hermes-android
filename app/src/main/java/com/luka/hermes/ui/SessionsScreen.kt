@@ -1,6 +1,5 @@
 package com.luka.hermes.ui
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -12,16 +11,64 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.luka.hermes.gateway.Session
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+
+/**
+ * Section grouping buckets used to render sticky headers in the sessions list.
+ *
+ * Order matters: a sorted-descending list of sessions will bucket cleanly when
+ * we walk the enum in declaration order.
+ */
+private enum class SessionDateBucket(val label: String) {
+    TODAY("Today"),
+    YESTERDAY("Yesterday"),
+    EARLIER("Earlier"),
+}
+
+/**
+ * Best-effort parse of an ISO-8601 timestamp coming off the wire.
+ *
+ * The gateway returns nullable strings; an unparseable value means we can't
+ * confidently bucket the session, so we drop it into [SessionDateBucket.EARLIER].
+ */
+private fun parseSessionInstant(raw: String?): Instant? {
+    if (raw.isNullOrBlank()) return null
+    return runCatching { Instant.parse(raw) }.getOrNull()
+}
+
+private fun bucketFor(updatedAt: String?, zone: ZoneId): SessionDateBucket {
+    val instant = parseSessionInstant(updatedAt) ?: return SessionDateBucket.EARLIER
+    val today = LocalDate.now(zone)
+    val sessionDate = instant.atZone(zone).toLocalDate()
+    return when {
+        sessionDate == today -> SessionDateBucket.TODAY
+        sessionDate == today.minusDays(1) -> SessionDateBucket.YESTERDAY
+        else -> SessionDateBucket.EARLIER
+    }
+}
+
+/**
+ * Flat list item used by [LazyColumn]: either a section header or a session row.
+ */
+private sealed interface SessionListItem {
+    data class Header(val bucket: SessionDateBucket) : SessionListItem
+    data class Row(val session: Session) : SessionListItem
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -39,6 +86,27 @@ fun SessionsScreen(
     val filteredSessions = remember(uiState.sessions, searchQuery) {
         if (searchQuery.isBlank()) uiState.sessions
         else uiState.sessions.filter { it.title?.contains(searchQuery, ignoreCase = true) == true }
+    }
+
+    // Bucket filtered sessions into Today / Yesterday / Earlier.
+    // Sections with zero items are omitted so we don't render empty headers.
+    val listItems = remember(filteredSessions) {
+        val zone = ZoneId.systemDefault()
+        val ordered = filteredSessions.sortedByDescending {
+            // Newest first; sessions with no parseable timestamp sink to the bottom
+            parseSessionInstant(it.updatedAt)?.toEpochMilli() ?: 0L
+        }
+        buildList {
+            var currentBucket: SessionDateBucket? = null
+            ordered.forEach { session ->
+                val bucket = bucketFor(session.updatedAt, zone)
+                if (bucket != currentBucket) {
+                    add(SessionListItem.Header(bucket))
+                    currentBucket = bucket
+                }
+                add(SessionListItem.Row(session))
+            }
+        }
     }
 
     Scaffold(
@@ -141,13 +209,24 @@ fun SessionsScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        items(filteredSessions, key = { it.id }) { session ->
-                            SessionCard(
-                                session = session,
-                                onClick = { onSessionSelected(session.id) },
-                                onRename = { showRenameDialog = session },
-                                onDelete = { showDeleteDialog = session },
-                            )
+                        items(
+                            items = listItems,
+                            key = { item ->
+                                when (item) {
+                                    is SessionListItem.Header -> "header-${item.bucket.name}"
+                                    is SessionListItem.Row -> "row-${item.session.id}"
+                                }
+                            },
+                        ) { item ->
+                            when (item) {
+                                is SessionListItem.Header -> SessionSectionHeader(item.bucket.label)
+                                is SessionListItem.Row -> SwipeToDeleteSessionRow(
+                                    session = item.session,
+                                    onClick = { onSessionSelected(item.session.id) },
+                                    onRename = { showRenameDialog = item.session },
+                                    onDeleteConfirmed = { viewModel.deleteSession(item.session.id) },
+                                )
+                            }
                         }
                         item { Spacer(Modifier.height(80.dp)) } // FAB clearance
                     }
@@ -199,6 +278,106 @@ fun SessionsScreen(
     }
 }
 
+@Composable
+private fun SessionSectionHeader(label: String) {
+    Text(
+        text = label.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp, bottom = 4.dp, start = 4.dp, end = 4.dp),
+    )
+}
+
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeToDeleteSessionRow(
+    session: Session,
+    onClick: () -> Unit,
+    onRename: () -> Unit,
+    onDeleteConfirmed: () -> Unit,
+) {
+    var showMenu by remember { mutableStateOf(false) }
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            // Only "left swipe complete" (toward start) commits the delete.
+            // Reset state for any other gesture so the row springs back.
+            when (value) {
+                SwipeToDismissBoxValue.StartToEnd -> {
+                    // Right swipe: not destructive, snap back.
+                    false
+                }
+                SwipeToDismissBoxValue.EndToStart -> {
+                    onDeleteConfirmed()
+                    true
+                }
+                SwipeToDismissBoxValue.Settled -> true
+            }
+        },
+        // Require ~40% swipe before committing so accidental flicks don't delete.
+        positionalThreshold = { totalDistance -> totalDistance * 0.4f },
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        modifier = Modifier.fillMaxWidth(),
+        enableDismissFromStartToEnd = false, // only allow left swipe
+        enableDismissFromEndToStart = true,
+        backgroundContent = { DeleteSwipeBackground(dismissState) },
+    ) {
+        SessionCard(
+            session = session,
+            onClick = onClick,
+            onRename = onRename,
+            onDelete = onDeleteConfirmed,
+            showMenu = showMenu,
+            onShowMenuChange = { showMenu = it },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DeleteSwipeBackground(dismissState: SwipeToDismissBoxState) {
+    val direction = dismissState.dismissDirection
+    val isSwiping = direction == SwipeToDismissBoxValue.EndToStart
+    // Animate alpha in/out as the row is dragged.
+    val targetAlpha = if (isSwiping) 1f else 0f
+    val alpha by animateFloatAsState(
+        targetValue = targetAlpha,
+        label = "swipe-bg-alpha",
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.errorContainer)
+            .padding(horizontal = 24.dp),
+        contentAlignment = Alignment.CenterEnd,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.alpha(alpha),
+        ) {
+            Icon(
+                imageVector = Icons.Default.Delete,
+                contentDescription = "Delete",
+                tint = MaterialTheme.colorScheme.onErrorContainer,
+            )
+            Text(
+                text = "Delete",
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SessionCard(
@@ -206,15 +385,15 @@ private fun SessionCard(
     onClick: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
+    showMenu: Boolean,
+    onShowMenuChange: (Boolean) -> Unit,
 ) {
-    var showMenu by remember { mutableStateOf(false) }
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = { showMenu = true },
+                onLongClick = { onShowMenuChange(true) },
             ),
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
@@ -247,14 +426,14 @@ private fun SessionCard(
             }
         }
 
-        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+        DropdownMenu(expanded = showMenu, onDismissRequest = { onShowMenuChange(false) }) {
             DropdownMenuItem(
                 text = { Text("Rename") },
-                onClick = { showMenu = false; onRename() },
+                onClick = { onShowMenuChange(false); onRename() },
             )
             DropdownMenuItem(
                 text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
-                onClick = { showMenu = false; onDelete() },
+                onClick = { onShowMenuChange(false); onDelete() },
             )
         }
     }

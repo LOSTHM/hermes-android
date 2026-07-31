@@ -139,9 +139,12 @@ fun ChatScreen(
             InputBar(
                 inputText = uiState.inputText,
                 isStreaming = uiState.isStreaming,
+                attachedImageUri = uiState.attachedImageUri,
                 onInputChanged = viewModel::onInputChanged,
                 onSend = viewModel::sendPrompt,
                 onStop = viewModel::interrupt,
+                onAttachImage = viewModel::attachImage,
+                onRemoveAttachment = viewModel::removeAttachment,
             )
         },
     ) { padding ->
@@ -307,41 +310,62 @@ private fun ConnectionDot(state: ConnectionState) {
 private fun InputBar(
     inputText: String,
     isStreaming: Boolean,
+    attachedImageUri: String?,
     onInputChanged: (String) -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit,
+    onAttachImage: (android.net.Uri) -> Unit,
+    onRemoveAttachment: () -> Unit,
 ) {
     Surface(
         tonalElevation = 3.dp,
         shadowElevation = 8.dp,
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
         ) {
-            OutlinedTextField(
-                value = inputText,
-                onValueChange = onInputChanged,
-                modifier = Modifier.weight(1f),
-                placeholder = { Text("Type a message…") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { if (!isStreaming) onSend() }),
-                enabled = !isStreaming,
-            )
-            Spacer(Modifier.width(8.dp))
-            if (isStreaming) {
-                FilledIconButton(onClick = onStop) {
-                    Icon(Icons.Filled.Stop, contentDescription = "Stop")
-                }
-            } else {
-                FilledIconButton(
-                    onClick = onSend,
-                    enabled = inputText.isNotBlank(),
-                ) {
-                    Icon(Icons.Default.Send, contentDescription = "Send")
+            // Attachment preview row (above the text field)
+            if (attachedImageUri != null) {
+                ImagePreview(
+                    imageUrl = attachedImageUri,
+                    onClose = onRemoveAttachment,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedTextField(
+                    value = inputText,
+                    onValueChange = onInputChanged,
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("Type a message…") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { if (!isStreaming) onSend() }),
+                    enabled = !isStreaming,
+                )
+                Spacer(Modifier.width(8.dp))
+                ImagePickerButton(
+                    onImagePicked = onAttachImage,
+                    enabled = !isStreaming,
+                )
+                Spacer(Modifier.width(8.dp))
+                if (isStreaming) {
+                    FilledIconButton(onClick = onStop) {
+                        Icon(Icons.Filled.Stop, contentDescription = "Stop")
+                    }
+                } else {
+                    FilledIconButton(
+                        onClick = onSend,
+                        enabled = inputText.isNotBlank(),
+                    ) {
+                        Icon(Icons.Default.Send, contentDescription = "Send")
+                    }
                 }
             }
         }
