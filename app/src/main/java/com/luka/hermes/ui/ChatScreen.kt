@@ -191,12 +191,12 @@ fun ChatScreen(
             )
         },
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            // Search bar when active
+            // Search bar when active — occupies layout space (not floating over messages)
             if (showSearch) {
                 ChatSearchBar(
                     query = searchQuery,
@@ -204,12 +204,16 @@ fun ChatScreen(
                     onClear = { searchQuery = "" },
                     matchCount = matchCount,
                     modifier = Modifier
-                        .align(Alignment.TopCenter)
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp, vertical = 4.dp),
                 )
             }
 
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f),
+            ) {
             // Context usage indicator (Direct mode)
             if (uiState.chatMode == ChatMode.DIRECT && uiState.messages.isNotEmpty()) {
                 ContextUsageIndicator(
@@ -217,7 +221,7 @@ fun ChatScreen(
                     maxTokens = uiState.maxTokens,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(top = if (showSearch) 64.dp else 8.dp),
+                        .padding(top = 8.dp),
                 )
             }
 
@@ -323,7 +327,8 @@ fun ChatScreen(
                     )
                 }
             }
-        }
+            } // end Box (message area)
+        } // end Column
     }
 
     // ── Dialogs ───────────────────────────────────────────────────────────
