@@ -21,7 +21,7 @@ class HermesRestException(message: String) : Exception(message)
 /**
  * Minimal REST client for the Hermes daemon HTTP API.
  *
- * The daemon exposes ~223 REST endpoints at `http://127.0.0.1:9119/api/*`
+ * The daemon exposes ~223 REST endpoints at `http://127.0.0.1:9119/api/`
  * authenticated with an `X-Hermes-Session-Token` header.  This client only
  * covers the GET subset used by the Git panel today, but is easy to extend.
  *
