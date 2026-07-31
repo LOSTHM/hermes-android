@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.luka.hermes"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.luka.hermes"
