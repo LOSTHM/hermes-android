@@ -238,8 +238,15 @@ fun HermesNavHost(
                 SettingsScreen(
                     viewModel = settingsViewModel,
                     onConfigured = {
+                        // Use the same safe pattern as bottom-nav tab clicks:
+                        // no popUpTo-inclusive here, which could corrupt the
+                        // shared bottom-nav stack.
                         navController.navigate("sessions") {
-                            popUpTo("sessions") { inclusive = true }
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
                         }
                     },
                 )

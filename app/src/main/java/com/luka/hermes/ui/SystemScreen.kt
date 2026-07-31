@@ -4,8 +4,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,6 +15,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,11 +32,6 @@ fun SystemScreen(
         topBar = {
             TopAppBar(
                 title = { Text("System", style = MaterialTheme.typography.headlineSmall) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                 ),
@@ -83,7 +78,11 @@ fun SystemScreen(
             // ── Processes ─────────────────────────────────────────────
             SectionCard("Processes") {
                 if (uiState.processesError) {
-                    Unavailable("process.list unavailable")
+                    Text(
+                        text = "Process list unavailable on serve",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
                 } else if (uiState.processes.isEmpty()) {
                     NoData()
                 } else {
@@ -132,6 +131,12 @@ fun SystemScreen(
                 val battery = uiState.system
                 if (battery == null) {
                     NoData()
+                } else if (battery.isAvailableFalse()) {
+                    Text(
+                        text = "Battery info unavailable",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 } else {
                     val level = battery.optString("level", "battery", "percent", "percentage")
                     val charging = battery.optString("charging", "is_charging", "status", "state")
@@ -149,25 +154,42 @@ fun SystemScreen(
 
             // ── Config ─────────────────────────────────────────────────
             SectionCard("Config") {
-                val config = uiState.config
-                if (config == null) {
-                    NoData()
-                } else {
-                    JsonSnippet(config)
+                when {
+                    uiState.configError -> Text(
+                        text = "Failed to load",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    uiState.config.isEmpty() -> NoData()
+                    else -> uiState.config.forEach { section ->
+                        val title = section.optString("title", "name", "label") ?: "Unknown"
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                            Text("•", color = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(8.dp))
+                            Text(title, style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Spacer(Modifier.height(6.dp))
+                    }
                 }
             }
 
             // ── Models ─────────────────────────────────────────────────
             SectionCard("Models") {
-                if (uiState.models.isEmpty()) {
-                    NoData()
-                } else {
-                    uiState.models.forEach { model ->
+                when {
+                    uiState.modelsError -> Text(
+                        text = "Failed to load",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    uiState.models.isEmpty() -> NoData()
+                    else -> uiState.models.forEach { provider ->
+                        val name = provider.optString("name", "id", "label") ?: "Unknown"
+                        val count = provider.modelCount()
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                             Text("•", color = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                text = model.optString("name", "id", "model", "value") ?: "Unknown",
+                                text = if (count != null) "$name · $count models" else name,
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
@@ -178,32 +200,42 @@ fun SystemScreen(
 
             // ── Usage ──────────────────────────────────────────────────
             SectionCard("Usage") {
-                val bars = uiState.usage?.toUsageBars().orEmpty()
-                if (bars.isEmpty()) {
-                    NoData()
-                } else {
-                    bars.forEach { (label, value, fraction) ->
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.width(120.dp),
-                            )
-                            LinearProgressIndicator(
-                                progress = { fraction.coerceIn(0f, 1f) },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(8.dp)
-                                    .clip(MaterialTheme.shapes.medium),
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = value,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                val usage = uiState.usage
+                when {
+                    usage != null && usage.isAvailableFalse() -> Text(
+                        text = "Usage bars unavailable",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    else -> {
+                        val bars = usage?.toUsageBars().orEmpty()
+                        if (bars.isEmpty()) {
+                            NoData()
+                        } else {
+                            bars.forEach { (label, value, fraction) ->
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.width(120.dp),
+                                    )
+                                    LinearProgressIndicator(
+                                        progress = { fraction.coerceIn(0f, 1f) },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(8.dp)
+                                            .clip(MaterialTheme.shapes.medium),
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = value,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Spacer(Modifier.height(8.dp))
+                            }
                         }
-                        Spacer(Modifier.height(8.dp))
                     }
                 }
             }
@@ -267,15 +299,6 @@ private fun NoData() {
 }
 
 @Composable
-private fun Unavailable(reason: String) {
-    Text(
-        text = "Unavailable · $reason",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.error,
-    )
-}
-
-@Composable
 private fun JsonSnippet(element: JsonElement) {
     val raw = element.toString()
     val text = if (raw.length > 600) raw.take(600) + "…" else raw
@@ -299,6 +322,18 @@ private fun JsonElement.processCpu(): String? =
 
 private fun JsonElement.processMem(): String? =
     optString("mem", "memory", "memory_percent", "rss", "mem%", "vms")
+
+/** True when a system/usage RPC reports the feature as unsupported. */
+private fun JsonElement.isAvailableFalse(): Boolean {
+    val obj = this as? JsonObject ?: return false
+    return obj["available"]?.let { (it as? JsonPrimitive)?.booleanOrNull } == false
+}
+
+/** Number of models a `model.options` provider entry carries. */
+private fun JsonElement.modelCount(): Int? {
+    val obj = this as? JsonObject ?: return null
+    return (obj["models"] as? JsonArray)?.size
+}
 
 private data class UsageBar(
     val label: String,

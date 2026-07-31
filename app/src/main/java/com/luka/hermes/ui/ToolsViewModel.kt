@@ -11,7 +11,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
 
 data class ToolsUiState(
     val cronJobs: List<JsonElement> = emptyList(),
@@ -107,6 +106,10 @@ class ToolsViewModel : ViewModel() {
  * objects so they are still visible. An array under a known key is used even
  * when empty — e.g. `agents.list` returns `{"processes": []}`, which must
  * resolve to an empty list rather than being treated as a single item.
+ *
+ * A known key whose value is a nested object is flattened too — e.g.
+ * `skills.manage list` returns `{"skills": {"general": [...], "android": [...]}}`,
+ * which merges every array inside that object into a single list.
  */
 internal fun JsonElement.toListItems(): List<JsonElement> = when (this) {
     is JsonArray -> toList()
@@ -114,13 +117,27 @@ internal fun JsonElement.toListItems(): List<JsonElement> = when (this) {
         val arrayKey = listOf(
             "jobs", "skills", "plugins", "agents", "processes", "tools", "toolsets",
             "items", "results", "data", "cron_jobs",
-        ).firstOrNull { key -> this[key] is JsonArray }
-        if (arrayKey != null) this[arrayKey]!!.jsonArray.toList() else listOf(this)
+        ).firstOrNull { key -> this[key] is JsonArray || this[key] is JsonObject }
+        if (arrayKey != null) {
+            when (val value = this[arrayKey]) {
+                is JsonArray -> value.toList()
+                is JsonObject -> value.values.filterIsInstance<JsonArray>().flatMap { it.toList() }
+                else -> emptyList()
+            }
+        } else {
+            listOf(this)
+        }
     }
     else -> emptyList()
 }
 
+/**
+ * Read a display string from a list item. Object items look up the given
+ * keys; bare primitives (e.g. a skill name returned as a plain string) are
+ * returned directly so nested-object lists render their values.
+ */
 internal fun JsonElement.optString(vararg keys: String): String? {
+    if (this is JsonPrimitive) return this.contentOrNull
     val obj = this as? JsonObject ?: return null
     for (key in keys) {
         val el = obj[key] ?: continue

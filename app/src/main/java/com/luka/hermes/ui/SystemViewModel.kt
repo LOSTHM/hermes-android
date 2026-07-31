@@ -6,14 +6,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 data class SystemUiState(
     val processes: List<JsonElement> = emptyList(),
     val processesError: Boolean = false,
     val system: JsonElement? = null,
     val systemError: Boolean = false,
-    val config: JsonElement? = null,
+    val config: List<JsonElement> = emptyList(),
     val configError: Boolean = false,
     val models: List<JsonElement> = emptyList(),
     val modelsError: Boolean = false,
@@ -60,10 +62,10 @@ class SystemViewModel : ViewModel() {
             try { system = repository.getSystemBattery() }
             catch (e: Exception) { systemError = true; errors += e.message ?: "system.battery failed" }
 
-            try { config = repository.getConfigShow() }
+            try { config = repository.getConfigShow().configSections() }
             catch (e: Exception) { configError = true; errors += e.message ?: "config.show failed" }
 
-            try { models = repository.getModelOptions().toListItems() }
+            try { models = repository.getModelOptions().modelProviders() }
             catch (e: Exception) { modelsError = true; errors += e.message ?: "model.options failed" }
 
             try { usage = repository.getUsageBars() }
@@ -98,4 +100,16 @@ class SystemViewModel : ViewModel() {
             loadSystem()
         }
     }
+}
+
+/** Extract the `sections` array from a `config.show` response. */
+private fun JsonElement.configSections(): List<JsonElement> {
+    val obj = this as? JsonObject ?: return emptyList()
+    return (obj["sections"] as? JsonArray)?.toList() ?: toListItems()
+}
+
+/** Extract the `providers` array from a `model.options` response. */
+private fun JsonElement.modelProviders(): List<JsonElement> {
+    val obj = this as? JsonObject ?: return emptyList()
+    return (obj["providers"] as? JsonArray)?.toList() ?: toListItems()
 }
