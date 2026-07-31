@@ -39,6 +39,16 @@ object RpcMethods {
     // ── Model ────────────────────────────────────────────────────────────
     const val MODEL_OPTIONS = "model.options"
 
+    // ── Process ──────────────────────────────────────────────────────────
+    const val PROCESS_LIST = "process.list"
+    const val PROCESS_KILL = "process.kill"
+
+    // ── System ───────────────────────────────────────────────────────────
+    const val SYSTEM_BATTERY = "system.battery"
+
+    // ── Usage ────────────────────────────────────────────────────────────
+    const val USAGE_BARS = "usage.bars"
+
     // ── Tools & Toolsets ─────────────────────────────────────────────────
     const val TOOLS_LIST = "tools.list"
     const val TOOLSETS_LIST = "toolsets.list"

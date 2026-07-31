@@ -9,10 +9,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddComment
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.AddComment
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Chat
+import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,6 +43,7 @@ data class BottomNavItem(
 private val bottomNavItems = listOf(
     BottomNavItem("sessions", "Sessions", Icons.Filled.Chat, Icons.Outlined.Chat),
     BottomNavItem("tools", "Tools", Icons.Filled.Build, Icons.Outlined.Build),
+    BottomNavItem("system", "System", Icons.Filled.Devices, Icons.Outlined.Devices),
     BottomNavItem("settings", "Settings", Icons.Filled.Settings, Icons.Outlined.Settings),
 )
 
@@ -162,6 +165,15 @@ fun HermesNavHost(
                 val toolsViewModel: ToolsViewModel = viewModel()
                 ToolsScreen(
                     viewModel = toolsViewModel,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            // System
+            composable("system") {
+                val systemViewModel: SystemViewModel = viewModel()
+                SystemScreen(
+                    viewModel = systemViewModel,
                     onBack = { navController.popBackStack() },
                 )
             }

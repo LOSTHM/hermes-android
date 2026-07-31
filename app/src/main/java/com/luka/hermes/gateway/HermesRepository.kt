@@ -347,6 +347,41 @@ class HermesRepository(
         return client.request(RpcMethods.TOOLSETS_LIST)
     }
 
+    // ── System ───────────────────────────────────────────────────────────
+
+    /** List running processes. Returns `process.list`. */
+    suspend fun listProcesses(): JsonElement {
+        return client.request(RpcMethods.PROCESS_LIST)
+    }
+
+    /** Kill a process by PID. Returns `process.kill`. */
+    suspend fun killProcess(pid: Int): JsonElement {
+        return client.request(
+            RpcMethods.PROCESS_KILL,
+            buildJsonObject { put("pid", JsonPrimitive(pid)) },
+        )
+    }
+
+    /** Battery / power status. Returns `system.battery`. */
+    suspend fun getSystemBattery(): JsonElement {
+        return client.request(RpcMethods.SYSTEM_BATTERY)
+    }
+
+    /** Full config dump. Returns `config.show`. */
+    suspend fun getConfigShow(): JsonElement {
+        return client.request(RpcMethods.CONFIG_SHOW)
+    }
+
+    /** Available model options. Returns `model.options`. */
+    suspend fun getModelOptions(): JsonElement {
+        return client.request(RpcMethods.MODEL_OPTIONS)
+    }
+
+    /** Usage bar data. Returns `usage.bars`. */
+    suspend fun getUsageBars(): JsonElement {
+        return client.request(RpcMethods.USAGE_BARS)
+    }
+
     // ── Config ────────────────────────────────────────────────────────────
 
     /**
