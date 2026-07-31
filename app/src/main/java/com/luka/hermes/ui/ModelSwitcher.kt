@@ -3,6 +3,7 @@ package com.luka.hermes.ui
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,8 +20,6 @@ import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -76,18 +75,14 @@ fun ModelDropdownInChat(
 
     var expanded by remember { mutableStateOf(false) }
 
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = !expanded },
-        modifier = modifier,
-    ) {
+    Box(modifier = modifier) {
         // ── Anchor chip ────────────────────────────────────────────────────
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 1.dp,
             modifier = Modifier
-                .menuAnchor()
+                .clickable { expanded = true }
                 .padding(horizontal = 2.dp),
         ) {
             Row(
@@ -122,7 +117,7 @@ fun ModelDropdownInChat(
         }
 
         // ── Dropdown menu ──────────────────────────────────────────────────
-        ExposedDropdownMenu(
+        DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
