@@ -36,7 +36,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -78,6 +80,23 @@ fun ChatScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    // Chat search state
+    var showSearch by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    val searchableMessages = uiState.messages.filterIsInstance<ChatItem.UserMessage>()
+        .map { it.text } + uiState.messages.filterIsInstance<ChatItem.AssistantMessage>().map { it.text }
+    val matchCount = remember(searchQuery, uiState.messages) {
+        if (searchQuery.isBlank()) 0
+        else uiState.messages.count { item ->
+            val text = when (item) {
+                is ChatItem.UserMessage -> item.text
+                is ChatItem.AssistantMessage -> item.text
+                else -> ""
+            }
+            text.contains(searchQuery, ignoreCase = true)
+        }
+    }
+
     // Track if user is near the bottom for auto-scroll + FAB visibility
     val isAtBottom by remember {
         derivedStateOf {
@@ -113,10 +132,11 @@ fun ChatScreen(
                         )
                         if (uiState.chatMode == ChatMode.DIRECT) {
                             Spacer(Modifier.width(6.dp))
-                            AssistChip(
-                                onClick = {},
-                                label = { Text("API", fontSize = 10.sp) },
-                                modifier = Modifier.height(24.dp),
+                            ModelDropdownInChat(
+                                models = emptyList(), // user types custom model
+                                selected = uiState.apiModel.ifEmpty { "Direct" },
+                                onSelect = {}, // model managed via settings
+                                modifier = Modifier.height(32.dp),
                             )
                         }
                     }
@@ -127,6 +147,19 @@ fun ChatScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = {
+                        hapticClick(context)
+                        ShareHelper.shareSession(
+                            context,
+                            sessionTitle = "Hermes Chat",
+                            messages = uiState.messages,
+                        )
+                    }) {
+                        Icon(Icons.Filled.Share, contentDescription = "Share")
+                    }
+                    IconButton(onClick = { showSearch = !showSearch; if (!showSearch) searchQuery = "" }) {
+                        Icon(Icons.Filled.Search, contentDescription = "Search")
+                    }
                     if (uiState.chatMode == ChatMode.DIRECT) {
                         IconButton(onClick = { viewModel.newDirectSession() }) {
                             Icon(Icons.Default.Add, contentDescription = "New Chat")
@@ -153,6 +186,31 @@ fun ChatScreen(
                 .fillMaxSize()
                 .padding(padding),
         ) {
+            // Search bar when active
+            if (showSearch) {
+                ChatSearchBar(
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it },
+                    onClear = { searchQuery = "" },
+                    matchCount = matchCount,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                )
+            }
+
+            // Context usage indicator (Direct mode)
+            if (uiState.chatMode == ChatMode.DIRECT && uiState.messages.isNotEmpty()) {
+                ContextUsageIndicator(
+                    usedTokens = uiState.promptTokens + uiState.completionTokens,
+                    maxTokens = uiState.maxTokens,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = if (showSearch) 64.dp else 8.dp),
+                )
+            }
+
             if (uiState.messages.isEmpty() && !uiState.isStreaming) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -172,6 +230,7 @@ fun ChatScreen(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
+                    .KeyboardDismissOnScroll()
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 contentPadding = PaddingValues(bottom = 4.dp),
@@ -186,13 +245,13 @@ fun ChatScreen(
                             is ChatItem.UserMessage -> UserChatBubble(
                                 text = item.text,
                                 timestamp = item.timestamp,
-                                onCopy = { copyToClipboard(context, item.text) },
+                                onCopy = { copyToClipboard(context, item.text); hapticClick(context) },
                             )
                             is ChatItem.AssistantMessage -> AssistantChatBubble(
                                 text = item.text,
                                 timestamp = item.timestamp,
                                 isStreaming = item.isStreaming,
-                                onCopy = { copyToClipboard(context, item.text) },
+                                onCopy = { copyToClipboard(context, item.text); hapticClick(context) },
                                 onRegenerate = { viewModel.regenerateLast() },
                             )
                             is ChatItem.ToolCallCard -> ToolCallCardView(item)
