@@ -7,12 +7,12 @@ plugins {
 
 android {
     namespace = "com.luka.hermes"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.luka.hermes"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 34
         versionCode = 2
         versionName = "2.0.0"
     }

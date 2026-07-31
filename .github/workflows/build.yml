@@ -20,6 +20,9 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install SDK platform
+        run: yes | sdkmanager "platforms;android-34" || true
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
