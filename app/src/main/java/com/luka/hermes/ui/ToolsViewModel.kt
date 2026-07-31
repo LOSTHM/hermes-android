@@ -2,15 +2,21 @@ package com.luka.hermes.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+
+internal const val SECTION_TIMEOUT_MS = 15_000L
 
 data class ToolsUiState(
     val cronJobs: List<JsonElement> = emptyList(),
@@ -44,60 +50,56 @@ class ToolsViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(loading = true, error = null)
 
-            val errors = mutableListOf<String>()
-
-            var cronJobs: List<JsonElement> = emptyList()
-            var cronJobsError = false
-            var skills: List<JsonElement> = emptyList()
-            var skillsError = false
-            var plugins: List<JsonElement> = emptyList()
-            var pluginsError = false
-            var agents: List<JsonElement> = emptyList()
-            var agentsError = false
-            var tools: List<JsonElement> = emptyList()
-            var toolsError = false
-            var toolsets: List<JsonElement> = emptyList()
-            var toolsetsError = false
-
-            // Each call is guarded independently: one failing section shows
-            // "Failed to load" but the other sections still render.
-            try { cronJobs = repository.listCronJobs().toListItems() }
-            catch (e: Exception) { cronJobsError = true; errors += e.message ?: "cron.manage failed" }
-
-            try { skills = repository.listSkills().toListItems() }
-            catch (e: Exception) { skillsError = true; errors += e.message ?: "skills.manage failed" }
-
-            try { plugins = repository.listPlugins().toListItems() }
-            catch (e: Exception) { pluginsError = true; errors += e.message ?: "plugins.list failed" }
-
-            try { agents = repository.listAgents().toListItems() }
-            catch (e: Exception) { agentsError = true; errors += e.message ?: "agents.list failed" }
-
-            try { tools = repository.listTools().toListItems() }
-            catch (e: Exception) { toolsError = true; errors += e.message ?: "tools.list failed" }
-
-            try { toolsets = repository.listToolsets().toListItems() }
-            catch (e: Exception) { toolsetsError = true; errors += e.message ?: "toolsets.list failed" }
+            // Load every section in parallel with a short per-RPC timeout so a
+            // slow call cannot block the whole page. Each section is guarded
+            // independently: one failing section shows "Failed to load" while
+            // the others still render.
+            val results = supervisorScope {
+                awaitAll(
+                    async { runSection(emptyList<JsonElement>()) { repository.listCronJobs(SECTION_TIMEOUT_MS).toListItems() } },
+                    async { runSection(emptyList<JsonElement>()) { repository.listSkills(SECTION_TIMEOUT_MS).toListItems() } },
+                    async { runSection(emptyList<JsonElement>()) { repository.listPlugins(SECTION_TIMEOUT_MS).toListItems() } },
+                    async { runSection(emptyList<JsonElement>()) { repository.listAgents(SECTION_TIMEOUT_MS).toListItems() } },
+                    async { runSection(emptyList<JsonElement>()) { repository.listTools(SECTION_TIMEOUT_MS).toListItems() } },
+                    async { runSection(emptyList<JsonElement>()) { repository.listToolsets(SECTION_TIMEOUT_MS).toListItems() } },
+                )
+            }
 
             _uiState.value = _uiState.value.copy(
-                cronJobs = cronJobs,
-                cronJobsError = cronJobsError,
-                skills = skills,
-                skillsError = skillsError,
-                plugins = plugins,
-                pluginsError = pluginsError,
-                agents = agents,
-                agentsError = agentsError,
-                tools = tools,
-                toolsError = toolsError,
-                toolsets = toolsets,
-                toolsetsError = toolsetsError,
+                cronJobs = results[0].value,
+                cronJobsError = results[0].error != null,
+                skills = results[1].value,
+                skillsError = results[1].error != null,
+                plugins = results[2].value,
+                pluginsError = results[2].error != null,
+                agents = results[3].value,
+                agentsError = results[3].error != null,
+                tools = results[4].value,
+                toolsError = results[4].error != null,
+                toolsets = results[5].value,
+                toolsetsError = results[5].error != null,
                 loading = false,
-                error = errors.takeIf { it.isNotEmpty() }?.joinToString(" · "),
+                error = results.mapNotNull { it.error }.joinToString(" · ").ifEmpty { null },
             )
         }
     }
 }
+
+/**
+ * Run one guarded section: on failure return [default] plus the error message
+ * so callers can flag the section as unavailable without losing the others.
+ * True coroutine cancellation is rethrown untouched.
+ */
+internal suspend fun <T> runSection(default: T, block: suspend () -> T): SectionResult<T> =
+    try {
+        SectionResult(block(), null)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        SectionResult(default, e.message ?: "section failed")
+    }
+
+internal data class SectionResult<T>(val value: T, val error: String?)
 
 /**
  * Normalise a tools/agents/system response into a list of items.

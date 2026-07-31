@@ -32,6 +32,8 @@ class HermesRepository(
 ) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
+    private val defaultRequestTimeoutMs: Long = 120_000L
+
     @Volatile
     private var wsUrl: String = ""
 
@@ -413,26 +415,28 @@ class HermesRepository(
 
     // ── Tools management ─────────────────────────────────────────────────
 
-    suspend fun listCronJobs(): JsonElement {
+    suspend fun listCronJobs(timeoutMs: Long = defaultRequestTimeoutMs): JsonElement {
         return client.request(
             RpcMethods.CRON_MANAGE,
             buildJsonObject { put("action", JsonPrimitive("list")) },
+            timeoutMs,
         )
     }
 
-    suspend fun listSkills(): JsonElement {
+    suspend fun listSkills(timeoutMs: Long = defaultRequestTimeoutMs): JsonElement {
         return client.request(
             RpcMethods.SKILLS_MANAGE,
             buildJsonObject { put("action", JsonPrimitive("list")) },
+            timeoutMs,
         )
     }
 
-    suspend fun listPlugins(): JsonElement {
-        return client.request(RpcMethods.PLUGINS_LIST)
+    suspend fun listPlugins(timeoutMs: Long = defaultRequestTimeoutMs): JsonElement {
+        return client.request(RpcMethods.PLUGINS_LIST, timeoutMs = timeoutMs)
     }
 
-    suspend fun listAgents(): JsonElement {
-        return client.request(RpcMethods.AGENTS_LIST)
+    suspend fun listAgents(timeoutMs: Long = defaultRequestTimeoutMs): JsonElement {
+        return client.request(RpcMethods.AGENTS_LIST, timeoutMs = timeoutMs)
     }
 
     // ── Spawn trees (delegated subagents) ────────────────────────────────
@@ -466,19 +470,19 @@ class HermesRepository(
         )
     }
 
-    suspend fun listTools(): JsonElement {
-        return client.request(RpcMethods.TOOLS_LIST)
+    suspend fun listTools(timeoutMs: Long = defaultRequestTimeoutMs): JsonElement {
+        return client.request(RpcMethods.TOOLS_LIST, timeoutMs = timeoutMs)
     }
 
-    suspend fun listToolsets(): JsonElement {
-        return client.request(RpcMethods.TOOLSETS_LIST)
+    suspend fun listToolsets(timeoutMs: Long = defaultRequestTimeoutMs): JsonElement {
+        return client.request(RpcMethods.TOOLSETS_LIST, timeoutMs = timeoutMs)
     }
 
     // ── System ───────────────────────────────────────────────────────────
 
     /** List running processes. Returns `process.list`. */
-    suspend fun listProcesses(): JsonElement {
-        return client.request(RpcMethods.PROCESS_LIST)
+    suspend fun listProcesses(timeoutMs: Long = defaultRequestTimeoutMs): JsonElement {
+        return client.request(RpcMethods.PROCESS_LIST, timeoutMs = timeoutMs)
     }
 
     /** Kill a process by PID. Returns `process.kill`. */
@@ -490,23 +494,23 @@ class HermesRepository(
     }
 
     /** Battery / power status. Returns `system.battery`. */
-    suspend fun getSystemBattery(): JsonElement {
-        return client.request(RpcMethods.SYSTEM_BATTERY)
+    suspend fun getSystemBattery(timeoutMs: Long = defaultRequestTimeoutMs): JsonElement {
+        return client.request(RpcMethods.SYSTEM_BATTERY, timeoutMs = timeoutMs)
     }
 
     /** Full config dump. Returns `config.show`. */
-    suspend fun getConfigShow(): JsonElement {
-        return client.request(RpcMethods.CONFIG_SHOW)
+    suspend fun getConfigShow(timeoutMs: Long = defaultRequestTimeoutMs): JsonElement {
+        return client.request(RpcMethods.CONFIG_SHOW, timeoutMs = timeoutMs)
     }
 
     /** Available model options. Returns `model.options`. */
-    suspend fun getModelOptions(): JsonElement {
-        return client.request(RpcMethods.MODEL_OPTIONS)
+    suspend fun getModelOptions(timeoutMs: Long = defaultRequestTimeoutMs): JsonElement {
+        return client.request(RpcMethods.MODEL_OPTIONS, timeoutMs = timeoutMs)
     }
 
     /** Usage bar data. Returns `usage.bars`. */
-    suspend fun getUsageBars(): JsonElement {
-        return client.request(RpcMethods.USAGE_BARS)
+    suspend fun getUsageBars(timeoutMs: Long = defaultRequestTimeoutMs): JsonElement {
+        return client.request(RpcMethods.USAGE_BARS, timeoutMs = timeoutMs)
     }
 
     // ── Config ────────────────────────────────────────────────────────────

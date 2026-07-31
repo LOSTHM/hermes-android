@@ -2,10 +2,12 @@ package com.luka.hermes.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -40,50 +42,44 @@ class SystemViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(loading = true, error = null)
 
-            val errors = mutableListOf<String>()
-
-            var processes: List<JsonElement> = emptyList()
-            var processesError = false
-            var system: JsonElement? = null
-            var systemError = false
-            var config: List<JsonElement> = emptyList()
-            var configError = false
-            var models: List<JsonElement> = emptyList()
-            var modelsError = false
-            var usage: JsonElement? = null
-            var usageError = false
-
-            // Each call is guarded independently so one failing section
-            // (e.g. process.list → 4001 "session not found" on serve) can
-            // never block the rest of the page from rendering.
-            try { processes = repository.listProcesses().toListItems() }
-            catch (e: Exception) { processesError = true; errors += e.message ?: "process.list failed" }
-
-            try { system = repository.getSystemBattery() }
-            catch (e: Exception) { systemError = true; errors += e.message ?: "system.battery failed" }
-
-            try { config = repository.getConfigShow().configSections() }
-            catch (e: Exception) { configError = true; errors += e.message ?: "config.show failed" }
-
-            try { models = repository.getModelOptions().modelProviders() }
-            catch (e: Exception) { modelsError = true; errors += e.message ?: "model.options failed" }
-
-            try { usage = repository.getUsageBars() }
-            catch (e: Exception) { usageError = true; errors += e.message ?: "usage.bars failed" }
+            // Load every section in parallel with a short per-RPC timeout so a
+            // slow call cannot block the whole page. Each section is guarded
+            // independently: one failing section (e.g. process.list → 4001
+            // "session not found" on serve) never blocks the rest.
+            val results = supervisorScope {
+                val processes = async { runSection(emptyList<JsonElement>()) { repository.listProcesses(SECTION_TIMEOUT_MS).toListItems() } }
+                val system = async { runSection<JsonElement?>(null) { repository.getSystemBattery(SECTION_TIMEOUT_MS) } }
+                val config = async { runSection(emptyList<JsonElement>()) { repository.getConfigShow(SECTION_TIMEOUT_MS).configSections() } }
+                val models = async { runSection(emptyList<JsonElement>()) { repository.getModelOptions(SECTION_TIMEOUT_MS).modelProviders() } }
+                val usage = async { runSection<JsonElement?>(null) { repository.getUsageBars(SECTION_TIMEOUT_MS) } }
+                SystemSections(
+                    processes = processes.await(),
+                    system = system.await(),
+                    config = config.await(),
+                    models = models.await(),
+                    usage = usage.await(),
+                )
+            }
 
             _uiState.value = _uiState.value.copy(
-                processes = processes,
-                processesError = processesError,
-                system = system,
-                systemError = systemError,
-                config = config,
-                configError = configError,
-                models = models,
-                modelsError = modelsError,
-                usage = usage,
-                usageError = usageError,
+                processes = results.processes.value,
+                processesError = results.processes.error != null,
+                system = results.system.value,
+                systemError = results.system.error != null,
+                config = results.config.value,
+                configError = results.config.error != null,
+                models = results.models.value,
+                modelsError = results.models.error != null,
+                usage = results.usage.value,
+                usageError = results.usage.error != null,
                 loading = false,
-                error = errors.takeIf { it.isNotEmpty() }?.joinToString(" · "),
+                error = listOfNotNull(
+                    results.processes.error,
+                    results.system.error,
+                    results.config.error,
+                    results.models.error,
+                    results.usage.error,
+                ).joinToString(" · ").ifEmpty { null },
             )
         }
     }
@@ -101,6 +97,14 @@ class SystemViewModel : ViewModel() {
         }
     }
 }
+
+private data class SystemSections(
+    val processes: SectionResult<List<JsonElement>>,
+    val system: SectionResult<JsonElement?>,
+    val config: SectionResult<List<JsonElement>>,
+    val models: SectionResult<List<JsonElement>>,
+    val usage: SectionResult<JsonElement?>,
+)
 
 /** Extract the `sections` array from a `config.show` response. */
 private fun JsonElement.configSections(): List<JsonElement> {
