@@ -68,14 +68,22 @@ class ThemesViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun JsonElement?.primitiveString(): String? = (this as? JsonPrimitive)?.contentOrNull
 
-    private fun JsonElement.toThemeItem(): ThemeItem? = when (this) {
-        is JsonObject -> ThemeItem(
-            name = this.optString("name", "id") ?: return null,
-            label = this.optString("label", "title"),
-            description = this.optString("description", "desc", "summary"),
-        )
-        is JsonPrimitive -> ThemeItem(name = contentOrNull ?: return null)
-        else -> null
+    private fun JsonElement.toThemeItem(): ThemeItem? {
+        return when (this) {
+            is JsonObject -> {
+                val name = this.optString("name", "id") ?: return null
+                ThemeItem(
+                    name = name,
+                    label = this.optString("label", "title"),
+                    description = this.optString("description", "desc", "summary"),
+                )
+            }
+            is JsonPrimitive -> {
+                val name = contentOrNull ?: return null
+                ThemeItem(name = name)
+            }
+            else -> null
+        }
     }
 }
 
