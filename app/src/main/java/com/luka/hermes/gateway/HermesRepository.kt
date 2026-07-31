@@ -255,6 +255,48 @@ class HermesRepository(
         )
     }
 
+    /**
+     * Query or flip the daemon's voice mode via `voice.toggle`.
+     *
+     * The daemon accepts one of `"status"` (default), `"on"`, `"off"`, or
+     * `"tts"`. A status/on/off reply carries `{enabled, record_key, tts}` plus
+     * (for status) `available`/`stt_available`/`audio_available` probes.
+     */
+    suspend fun toggleVoice(action: String = "status"): JsonElement {
+        return client.request(
+            RpcMethods.VOICE_TOGGLE,
+            buildJsonObject { put("action", JsonPrimitive(action)) },
+        )
+    }
+
+    /**
+     * Begin one VAD-bounded push-to-talk capture via `voice.record`.
+     *
+     * The daemon transcribes and emits `voice.transcript` once silence stops
+     * the recorder. Returns `{"status":"recording"}` or `{"status":"busy"}`
+     * if a capture is already running; fails with a 4015 error when voice
+     * mode is off.
+     */
+    suspend fun startVoiceRecord(): JsonElement {
+        return client.request(
+            RpcMethods.VOICE_RECORD,
+            buildJsonObject { put("action", JsonPrimitive("start")) },
+        )
+    }
+
+    /**
+     * Force-transcribe and stop the active capture via `voice.record`.
+     *
+     * Returns `{"status":"stopped"}`; the transcript arrives as a
+     * `voice.transcript` event shortly after.
+     */
+    suspend fun stopVoiceRecord(): JsonElement {
+        return client.request(
+            RpcMethods.VOICE_RECORD,
+            buildJsonObject { put("action", JsonPrimitive("stop")) },
+        )
+    }
+
     // ── Image attachment ────────────────────────────────────────────────
 
     /**

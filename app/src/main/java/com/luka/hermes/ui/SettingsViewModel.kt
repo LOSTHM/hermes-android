@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.luka.hermes.gateway.ConnectionState
+import com.luka.hermes.gateway.HermesRestClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -34,6 +35,8 @@ data class SettingsUiState(
     val saved: Boolean = false,
     val testResult: String? = null,
     val testing: Boolean = false,
+    val exporting: Boolean = false,
+    val exportError: String? = null,
 )
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
@@ -44,9 +47,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
+    private val _exportJson = MutableStateFlow<String?>(null)
+    val exportJson: StateFlow<String?> = _exportJson.asStateFlow()
+
     val connectionState: StateFlow<ConnectionState> = repository.connectionState
 
     init {
+        HermesRestClient.init(application)
         viewModelScope.launch {
             val prefs = dataStore.data.first()
             _uiState.value = _uiState.value.copy(
@@ -163,6 +170,34 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             }
         }
     }
+
+    /**
+     * Export the most recent Hermes session as JSON via
+     * `GET /api/sessions/{id}/export` and publish it to [exportJson] so the
+     * screen can share it. Falls back to any available session when none is
+     * "current" (the daemon keeps no client-side current-session notion).
+     */
+    fun exportCurrentSession() {
+        if (_uiState.value.exporting) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(exporting = true, exportError = null)
+            try {
+                val sessions = repository.listSessions()
+                val session = sessions.firstOrNull()
+                    ?: throw IllegalStateException("No sessions available to export")
+                val data = HermesRestClient.getJson("sessions/${session.id}/export")
+                _exportJson.value = data.toString()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    exportError = e.message ?: "Export failed",
+                )
+            } finally {
+                _uiState.value = _uiState.value.copy(exporting = false)
+            }
+        }
+    }
+
+    fun clearExportJson() { _exportJson.value = null }
 
     fun clearSavedFlag() { _uiState.value = _uiState.value.copy(saved = false) }
     fun disconnect() { repository.disconnect() }

@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.luka.hermes.gateway.ConnectionState
@@ -21,11 +22,21 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
+    val exportJson by viewModel.exportJson.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     LaunchedEffect(uiState.saved) {
         if (uiState.saved) {
             viewModel.clearSavedFlag()
             onConfigured()
+        }
+    }
+
+    // When an export finishes, hand the JSON to the system share sheet.
+    LaunchedEffect(exportJson) {
+        if (exportJson != null) {
+            ShareHelper.shareText(context, "Hermes session export", exportJson!!)
+            viewModel.clearExportJson()
         }
     }
 
@@ -92,6 +103,27 @@ fun SettingsScreen(
                 )
                 Spacer(Modifier.height(8.dp))
                 ConnectionStatusCard(connectionState)
+
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = viewModel::exportCurrentSession,
+                    enabled = !uiState.exporting,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    if (uiState.exporting) {
+                        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text(if (uiState.exporting) "Exporting…" else "Export Current Session")
+                }
+                uiState.exportError?.let { err ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = err,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
 
             // ── Direct API Mode ──

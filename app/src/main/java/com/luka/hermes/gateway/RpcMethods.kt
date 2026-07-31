@@ -34,6 +34,8 @@ object RpcMethods {
 
     // ── Voice ────────────────────────────────────────────────────────────
     const val VOICE_TTS = "voice.tts"
+    const val VOICE_TOGGLE = "voice.toggle"
+    const val VOICE_RECORD = "voice.record"
 
     // ── Image ────────────────────────────────────────────────────────────
     const val IMAGE_ATTACH_BYTES = "image.attach_bytes"
