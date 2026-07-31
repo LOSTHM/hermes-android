@@ -191,7 +191,7 @@ fun ChatScreen(
             )
         },
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
@@ -323,8 +323,7 @@ fun ChatScreen(
                     )
                 }
             }
-            } // end Box (message area)
-        } // end Column
+        }
     }
 
     // ── Dialogs ───────────────────────────────────────────────────────────
