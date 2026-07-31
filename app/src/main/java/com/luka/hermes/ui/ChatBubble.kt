@@ -12,6 +12,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -269,7 +271,8 @@ fun AssistantChatBubble(
     timestamp: Long,
     isStreaming: Boolean,
     onCopy: (String) -> Unit,
-    onRegenerate: () -> Unit
+    onRegenerate: () -> Unit,
+    onSpeak: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var menuVisible by remember { mutableStateOf(false) }
@@ -339,8 +342,26 @@ fun AssistantChatBubble(
                 }
             }
 
-            // Time label below
-            TimeDisplay(epochMillis = timestamp)
+            // Time label below (with optional speaker button)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                if (onSpeak != null) {
+                    IconButton(
+                        onClick = onSpeak,
+                        modifier = Modifier.size(28.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.VolumeUp,
+                            contentDescription = "Speak",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+                TimeDisplay(epochMillis = timestamp)
+            }
         }
     }
 

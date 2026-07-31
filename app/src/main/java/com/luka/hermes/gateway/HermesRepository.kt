@@ -225,6 +225,53 @@ class HermesRepository(
         )
     }
 
+    /**
+     * Answer a `terminal.read.request` event with the serialized terminal
+     * buffer. The gateway blocks the agent's `read_terminal` tool until this
+     * is answered.
+     * @param requestId  The `request_id` from [TerminalReadRequest].
+     * @param response   The serialized terminal buffer + line metadata.
+     */
+    suspend fun respondTerminalRead(requestId: String, response: String): JsonElement {
+        return client.request(
+            RpcMethods.TERMINAL_READ_RESPOND,
+            buildJsonObject {
+                put("request_id", JsonPrimitive(requestId))
+                put("text", JsonPrimitive(response))
+            },
+        )
+    }
+
+    // ── Voice ───────────────────────────────────────────────────────────
+
+    /**
+     * Ask the gateway to speak [text] aloud via the server-side TTS pipeline.
+     * Returns `{"status":"speaking"}`.
+     */
+    suspend fun voiceTts(text: String): JsonElement {
+        return client.request(
+            RpcMethods.VOICE_TTS,
+            buildJsonObject { put("text", JsonPrimitive(text)) },
+        )
+    }
+
+    // ── Image attachment ────────────────────────────────────────────────
+
+    /**
+     * Attach an image to the session from raw base64 bytes (remote-client
+     * path). The gateway writes the bytes into its own images dir and queues
+     * them so the next `prompt.submit` picks them up.
+     *
+     * @param base64Data  base64 image bytes. A `data:image/...;base64,` prefix
+     *                    and embedded whitespace are accepted.
+     */
+    suspend fun attachImageBytes(base64Data: String): JsonElement {
+        return client.request(
+            RpcMethods.IMAGE_ATTACH_BYTES,
+            buildJsonObject { put("content_base64", JsonPrimitive(base64Data)) },
+        )
+    }
+
     // ── Session actions ───────────────────────────────────────────────────
 
     /**

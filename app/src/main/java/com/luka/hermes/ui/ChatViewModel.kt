@@ -1,5 +1,9 @@
 package com.luka.hermes.ui
 
+import android.content.ContentResolver
+import android.content.Context
+import android.net.Uri
+import android.util.Base64
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.luka.hermes.gateway.*
@@ -71,6 +75,12 @@ data class ApprovalRequestData(
     val description: String?,
 )
 
+data class TerminalReadRequestData(
+    val id: String,
+    val start: Int? = null,
+    val count: Int? = null,
+)
+
 data class ChatUiState(
     val sessionId: String = "",
     val messages: List<ChatItem> = emptyList(),
@@ -78,6 +88,7 @@ data class ChatUiState(
     val connectionState: ConnectionState = ConnectionState.Idle,
     val clarifyRequest: ClarifyRequestData? = null,
     val approvalRequest: ApprovalRequestData? = null,
+    val terminalRequest: TerminalReadRequestData? = null,
     val coldStartWarning: Boolean = false,
     val inputText: String = "",
     val chatMode: ChatMode = ChatMode.HERMES,
@@ -116,6 +127,7 @@ class ChatViewModel : ViewModel() {
             isStreaming = false,
             clarifyRequest = null,
             approvalRequest = null,
+            terminalRequest = null,
             coldStartWarning = false,
         )
         // Load session history in Hermes mode
@@ -182,7 +194,7 @@ class ChatViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(inputText = text)
     }
 
-    fun sendPrompt() {
+    fun sendPrompt(context: Context? = null) {
         val text = _uiState.value.inputText.trim()
         if (text.isEmpty()) return
 
@@ -211,8 +223,71 @@ class ChatViewModel : ViewModel() {
         )
 
         when (mode) {
-            ChatMode.HERMES -> startHermesPrompt(text)
+            ChatMode.HERMES -> {
+                val imageUri = _uiState.value.attachedImageUri
+                if (imageUri != null && context != null) {
+                    viewModelScope.launch {
+                        try {
+                            val base64 = readImageAsBase64(context.contentResolver, Uri.parse(imageUri))
+                            if (base64 != null) {
+                                repository.attachImageBytes(base64)
+                                _uiState.update { it.copy(attachedImageUri = null) }
+                            }
+                        } catch (e: Exception) {
+                            _uiState.update { it.copy(isStreaming = false) }
+                            addError("Failed to attach image: ${e.message}")
+                            return@launch
+                        }
+                        startHermesPrompt(text)
+                    }
+                } else {
+                    startHermesPrompt(text)
+                }
+            }
             ChatMode.DIRECT -> startDirectPrompt(text)
+        }
+    }
+
+    // ── Voice / terminal read / attachment actions ───────────────────────
+
+    /** Ask the server to read [text] aloud (Hermes mode only; failures are silent). */
+    fun ttsSpeak(text: String) {
+        if (text.isBlank()) return
+        if (_uiState.value.chatMode != ChatMode.HERMES) return
+        viewModelScope.launch {
+            try {
+                repository.voiceTts(text)
+            } catch (_: Exception) {
+                // Silent — TTS is best-effort.
+            }
+        }
+    }
+
+    /** Answer a `terminal.read.request` with [response] and dismiss the dialog. */
+    fun respondTerminalRead(requestId: String, response: String) {
+        viewModelScope.launch {
+            try {
+                repository.respondTerminalRead(requestId, response)
+            } catch (e: Exception) {
+                addError("Failed to send terminal response: ${e.message}")
+            }
+        }
+        _uiState.update { it.copy(terminalRequest = null) }
+    }
+
+    /** Dismiss the terminal read dialog without answering. */
+    fun dismissTerminalRead() {
+        _uiState.update { it.copy(terminalRequest = null) }
+    }
+
+    /** Read a content:// image URI into a base64 string, or null on failure. */
+    private fun readImageAsBase64(resolver: ContentResolver, uri: Uri): String? {
+        return try {
+            resolver.openInputStream(uri)?.use { input ->
+                Base64.encodeToString(input.readBytes(), Base64.NO_WRAP)
+            }
+        } catch (_: Exception) {
+            null
         }
     }
 
@@ -328,6 +403,16 @@ class ChatViewModel : ViewModel() {
                         id = id,
                         title = event.title,
                         description = event.description,
+                    ),
+                )
+            }
+            is TerminalReadRequest -> {
+                val id = event.requestId ?: return
+                _uiState.value = _uiState.value.copy(
+                    terminalRequest = TerminalReadRequestData(
+                        id = id,
+                        start = event.start,
+                        count = event.count,
                     ),
                 )
             }

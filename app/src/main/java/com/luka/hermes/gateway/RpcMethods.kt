@@ -30,6 +30,13 @@ object RpcMethods {
     const val APPROVAL_RESPOND = "approval.respond"
     const val SUDO_RESPOND = "sudo.respond"
     const val SECRET_RESPOND = "secret.respond"
+    const val TERMINAL_READ_RESPOND = "terminal.read.respond"
+
+    // ── Voice ────────────────────────────────────────────────────────────
+    const val VOICE_TTS = "voice.tts"
+
+    // ── Image ────────────────────────────────────────────────────────────
+    const val IMAGE_ATTACH_BYTES = "image.attach_bytes"
 
     // ── Config ───────────────────────────────────────────────────────────
     const val CONFIG_GET = "config.get"

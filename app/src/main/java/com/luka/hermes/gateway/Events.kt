@@ -190,6 +190,18 @@ data class SecretRequest(
         get() = payload?.get("prompt")?.jsonPrimitive?.contentOrNull
 }
 
+data class TerminalReadRequest(
+    override val sessionId: String?,
+    override val payload: JsonObject?,
+) : GatewayEvent("terminal.read.request", sessionId, payload) {
+    val requestId: String?
+        get() = payload?.get("request_id")?.jsonPrimitive?.contentOrNull
+    val start: Int?
+        get() = payload?.get("start")?.jsonPrimitive?.intOrNull
+    val count: Int?
+        get() = payload?.get("count")?.jsonPrimitive?.intOrNull
+}
+
 // ── Terminal events ─────────────────────────────────────────────────────────
 
 data class BackgroundComplete(
@@ -263,6 +275,7 @@ fun parseGatewayEvent(params: JsonObject): GatewayEvent {
         "approval.request" -> ApprovalRequest(sessionId, payload)
         "sudo.request" -> SudoRequest(sessionId, payload)
         "secret.request" -> SecretRequest(sessionId, payload)
+        "terminal.read.request" -> TerminalReadRequest(sessionId, payload)
 
         "background.complete" -> BackgroundComplete(sessionId, payload)
         "error" -> EventError(sessionId, payload)

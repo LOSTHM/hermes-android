@@ -184,7 +184,7 @@ fun ChatScreen(
                 isStreaming = uiState.isStreaming,
                 attachedImageUri = uiState.attachedImageUri,
                 onInputChanged = viewModel::onInputChanged,
-                onSend = viewModel::sendPrompt,
+                onSend = { viewModel.sendPrompt(context) },
                 onStop = viewModel::interrupt,
                 onAttachImage = viewModel::attachImage,
                 onRemoveAttachment = viewModel::removeAttachment,
@@ -264,6 +264,9 @@ fun ChatScreen(
                                 isStreaming = item.isStreaming,
                                 onCopy = { copyToClipboard(context, item.text); hapticClick(context) },
                                 onRegenerate = { viewModel.regenerateLast() },
+                                onSpeak = if (uiState.chatMode == ChatMode.HERMES)
+                                    { { viewModel.ttsSpeak(item.text) } }
+                                else null,
                             )
                             is ChatItem.ToolCallCard -> ToolCallCardView(item)
                             is ChatItem.ThinkingBlock -> ThinkingBlockView(item)
@@ -362,6 +365,45 @@ fun ChatScreen(
             dismissButton = {
                 TextButton(onClick = { viewModel.respondApproval(req.id, false) }) {
                     Text("Deny")
+                }
+            },
+        )
+    }
+
+    uiState.terminalRequest?.let { req ->
+        var terminalInput by remember(req.id) { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = viewModel::dismissTerminalRead,
+            title = { Text("Terminal Read") },
+            text = {
+                Column {
+                    Text(
+                        text = "The agent wants to read the terminal output. Paste or type the buffer below.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = terminalInput,
+                        onValueChange = { terminalInput = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Terminal content…") },
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.respondTerminalRead(req.id, terminalInput)
+                        terminalInput = ""
+                    },
+                    enabled = terminalInput.isNotBlank(),
+                ) {
+                    Text("Send")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissTerminalRead) {
+                    Text("Skip")
                 }
             },
         )
