@@ -196,7 +196,7 @@ fun ChatScreen(
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            // Search bar when active — occupies layout space (not floating over messages)
+            // Search bar when active
             if (showSearch) {
                 ChatSearchBar(
                     query = searchQuery,
@@ -204,16 +204,12 @@ fun ChatScreen(
                     onClear = { searchQuery = "" },
                     matchCount = matchCount,
                     modifier = Modifier
+                        .align(Alignment.TopCenter)
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp, vertical = 4.dp),
                 )
             }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .weight(1f),
-            ) {
             // Context usage indicator (Direct mode)
             if (uiState.chatMode == ChatMode.DIRECT && uiState.messages.isNotEmpty()) {
                 ContextUsageIndicator(
@@ -221,7 +217,7 @@ fun ChatScreen(
                     maxTokens = uiState.maxTokens,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(top = 8.dp),
+                        .padding(top = if (showSearch) 64.dp else 8.dp),
                 )
             }
 
@@ -248,7 +244,7 @@ fun ChatScreen(
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
-                contentPadding = PaddingValues(bottom = 4.dp),
+                contentPadding = PaddingValues(top = if (showSearch) 64.dp else 4.dp, bottom = 4.dp),
             ) {
                 items(uiState.messages, key = { it.stableId }) { item ->
                     AnimatedVisibility(
@@ -314,7 +310,7 @@ fun ChatScreen(
                 Card(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(horizontal = 32.dp, vertical = 8.dp),
+                        .padding(horizontal = 32.dp, vertical = if (showSearch) 72.dp else 8.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                     ),
