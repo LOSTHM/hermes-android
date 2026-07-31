@@ -9,11 +9,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 
 data class GitUiState(
-    val status: JsonElement? = null,
-    val branches: JsonElement? = null,
-    val baseBranches: JsonElement? = null,
+    val status: JsonElement = JsonNull,
+    val branches: JsonElement = JsonNull,
+    val baseBranches: JsonElement = JsonNull,
     val loading: Boolean = false,
     val error: String? = null,
 )
@@ -32,9 +33,9 @@ class GitViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(loading = true, error = null)
 
-            var status: JsonElement? = null
-            var branches: JsonElement? = null
-            var baseBranches: JsonElement? = null
+            var status: JsonElement = JsonNull
+            var branches: JsonElement = JsonNull
+            var baseBranches: JsonElement = JsonNull
             val errors = mutableListOf<String>()
 
             try { status = HermesRestClient.getJson("git/status") }
