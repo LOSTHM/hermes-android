@@ -80,9 +80,15 @@ fun SystemScreen(
             SectionCard("Processes") {
                 if (uiState.processesError) {
                     Text(
-                        text = "Process list unavailable on serve",
+                        text = "Process list shows background tasks of the active session.\nNone available in this daemon.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "For system resources (CPU/memory/disk), see System Stats.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 } else if (uiState.processes.isEmpty()) {
                     NoData()
