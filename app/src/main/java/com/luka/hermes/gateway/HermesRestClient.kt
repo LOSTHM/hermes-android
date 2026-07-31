@@ -10,7 +10,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
@@ -61,13 +60,13 @@ object HermesRestClient {
      * @throws HermesRestException on non-2xx responses (e.g. 401) or transport failures.
      */
     suspend fun get(path: String, queryParams: Map<String, String> = emptyMap()): String = withContext(Dispatchers.IO) {
-        val url = toHttpUrlOrNull("$BASE_URL/$path")
-            ?: throw HermesRestException("Invalid URL for /api/$path")
-        val urlBuilder = url.newBuilder()
-        queryParams.forEach { (key, value) -> urlBuilder.addQueryParameter(key, value) }
+        val query = if (queryParams.isEmpty()) "" else
+            "?" + queryParams.entries.joinToString("&") { (k, v) ->
+                "${k}=${java.net.URLEncoder.encode(v, "UTF-8")}"
+            }
 
         val request = Request.Builder()
-            .url(urlBuilder.build())
+            .url("$BASE_URL/$path$query")
             .header("X-Hermes-Session-Token", sessionToken())
             .build()
 
