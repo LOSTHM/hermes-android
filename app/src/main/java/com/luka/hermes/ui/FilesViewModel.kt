@@ -1,5 +1,6 @@
 package com.luka.hermes.ui
 
+import com.luka.hermes.gateway.HermesRestClient
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
