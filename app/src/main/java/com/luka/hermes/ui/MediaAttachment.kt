@@ -160,7 +160,7 @@ fun FileChip(
         modifier = modifier
             .widthIn(max = 260.dp)
             .padding(2.dp),
-        shape = RoundedCornerShape(AssistChipDefaults.shape.cornerSize),
+        shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
         tonalElevation = 1.dp,
