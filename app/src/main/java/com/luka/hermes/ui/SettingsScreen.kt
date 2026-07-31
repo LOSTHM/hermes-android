@@ -65,7 +65,7 @@ fun SettingsScreen(
                 ThemeMode.entries.forEachIndexed { i, mode ->
                     SegmentedButton(
                         selected = uiState.themeMode == mode,
-                        onClick = { viewModel.updateThemeMode(mode) },
+                        onClick = { viewModel.persistThemeMode(mode) },
                         shape = SegmentedButtonDefaults.itemShape(i, ThemeMode.entries.size),
                     ) { Text(mode.name) }
                 }

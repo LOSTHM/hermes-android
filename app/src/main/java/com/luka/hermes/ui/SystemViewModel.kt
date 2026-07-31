@@ -73,12 +73,13 @@ class SystemViewModel : ViewModel() {
                 usage = results.usage.value,
                 usageError = results.usage.error != null,
                 loading = false,
+                // process.list / battery / usage fail with "unsupported on serve";
+                // those are expected, so they set the section flag only and must
+                // not trigger the global error card. Only genuinely unexpected
+                // failures (config / models) surface there.
                 error = listOfNotNull(
-                    results.processes.error,
-                    results.system.error,
                     results.config.error,
                     results.models.error,
-                    results.usage.error,
                 ).joinToString(" · ").ifEmpty { null },
             )
         }

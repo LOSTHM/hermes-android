@@ -81,6 +81,21 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun updateMaxTokens(m: Int) { _uiState.value = _uiState.value.copy(maxTokens = m) }
     fun updateSystemPrompt(s: String) { _uiState.value = _uiState.value.copy(systemPrompt = s) }
     fun updateThemeMode(m: ThemeMode) { _uiState.value = _uiState.value.copy(themeMode = m) }
+
+    /**
+     * Update the theme mode and persist it to DataStore immediately, so
+     * MainActivity's DataStore collector reacts right away (SYSTEM ↔ DARK
+     * switching works without pressing Save). Other settings keep their
+     * save-and-connect behaviour.
+     */
+    fun persistThemeMode(mode: ThemeMode) {
+        _uiState.value = _uiState.value.copy(themeMode = mode)
+        viewModelScope.launch {
+            dataStore.edit { prefs ->
+                prefs[SettingsKeys.THEME_MODE] = mode.name
+            }
+        }
+    }
     fun updateChatMode(m: ChatMode) { _uiState.value = _uiState.value.copy(chatMode = m) }
 
     fun saveAndConnect() {

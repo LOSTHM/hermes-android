@@ -68,6 +68,57 @@ fun GitScreen(
         ) {
             Spacer(Modifier.height(8.dp))
 
+            // ── Repository selector ────────────────────────────────────
+            if (uiState.repos.isNotEmpty()) {
+                GitSectionCard("Repository") {
+                    uiState.repos.forEach { repo ->
+                        val selected = repo.root == uiState.repoPath
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(MaterialTheme.shapes.small)
+                                .background(
+                                    if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                    else Color.Transparent,
+                                )
+                                .clickable { viewModel.selectRepo(repo.root) }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = if (selected) "●" else "○",
+                                color = if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    text = repo.label,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                )
+                                if (repo.root != repo.label) {
+                                    Text(
+                                        text = repo.root,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                            if (selected) {
+                                Text(
+                                    text = "active",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             if (uiState.loading) {
                 Row(
                     modifier = Modifier

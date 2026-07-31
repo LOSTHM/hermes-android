@@ -17,6 +17,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -167,6 +168,24 @@ fun SystemScreen(
                             Text("•", color = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.width(8.dp))
                             Text(title, style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        section.configRows().forEach { (key, value) ->
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                                Text(
+                                    text = key,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.width(140.dp),
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = value,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                            Spacer(Modifier.height(4.dp))
                         }
                         Spacer(Modifier.height(6.dp))
                     }
@@ -327,6 +346,24 @@ private fun JsonElement.processMem(): String? =
 private fun JsonElement.isAvailableFalse(): Boolean {
     val obj = this as? JsonObject ?: return false
     return obj["available"]?.let { (it as? JsonPrimitive)?.booleanOrNull } == false
+}
+
+/**
+ * Extract the `[key, value]` pairs from a `config.show` section's `rows`
+ * (rows is an array of arrays, e.g. `[["Model","deepseek-v4-flash"], ...]`).
+ */
+private fun JsonElement.configRows(): List<Pair<String, String>> {
+    val obj = this as? JsonObject ?: return emptyList()
+    val rows = obj["rows"] as? JsonArray ?: return emptyList()
+    return rows.mapNotNull { row ->
+        val pair = row as? JsonArray ?: return@mapNotNull null
+        if (pair.isEmpty()) return@mapNotNull null
+        val key = (pair[0] as? JsonPrimitive)?.contentOrNull ?: pair[0].toString()
+        val value = if (pair.size > 1) {
+            (pair[1] as? JsonPrimitive)?.contentOrNull ?: pair[1].toString()
+        } else ""
+        key to value
+    }
 }
 
 /** Number of models a `model.options` provider entry carries. */
