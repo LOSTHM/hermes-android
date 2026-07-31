@@ -315,6 +315,38 @@ class HermesRepository(
         )
     }
 
+    // ── Tools management ─────────────────────────────────────────────────
+
+    suspend fun listCronJobs(): JsonElement {
+        return client.request(
+            RpcMethods.CRON_MANAGE,
+            buildJsonObject { put("action", JsonPrimitive("list")) },
+        )
+    }
+
+    suspend fun listSkills(): JsonElement {
+        return client.request(
+            RpcMethods.SKILLS_MANAGE,
+            buildJsonObject { put("action", JsonPrimitive("list")) },
+        )
+    }
+
+    suspend fun listPlugins(): JsonElement {
+        return client.request(RpcMethods.PLUGINS_LIST)
+    }
+
+    suspend fun listAgents(): JsonElement {
+        return client.request(RpcMethods.AGENTS_LIST)
+    }
+
+    suspend fun listTools(): JsonElement {
+        return client.request(RpcMethods.TOOLS_LIST)
+    }
+
+    suspend fun listToolsets(): JsonElement {
+        return client.request(RpcMethods.TOOLSETS_LIST)
+    }
+
     // ── Config ────────────────────────────────────────────────────────────
 
     /**
