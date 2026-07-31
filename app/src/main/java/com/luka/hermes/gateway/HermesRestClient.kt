@@ -118,4 +118,32 @@ object HermesRestClient {
             responseBody
         }
     }
+
+    /**
+     * Perform a DELETE against `http://127.0.0.1:9119/api/{path}`.
+     *
+     * Query parameters are appended URL-encoded (e.g. `delete("webhooks/foo")`).
+     *
+     * @throws HermesRestException on non-2xx responses or transport failures.
+     */
+    suspend fun delete(path: String, queryParams: Map<String, String> = emptyMap()): String = withContext(Dispatchers.IO) {
+        val query = if (queryParams.isEmpty()) "" else
+            "?" + queryParams.entries.joinToString("&") { (k, v) ->
+                "${k}=${java.net.URLEncoder.encode(v, "UTF-8")}"
+            }
+
+        val request = Request.Builder()
+            .url("$BASE_URL/$path$query")
+            .header("X-Hermes-Session-Token", sessionToken())
+            .delete()
+            .build()
+
+        httpClient.newCall(request).execute().use { response ->
+            val responseBody = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                throw HermesRestException("HTTP ${response.code} for /api/$path: $responseBody")
+            }
+            responseBody
+        }
+    }
 }
