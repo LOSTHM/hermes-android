@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 
 data class FsEntry(
     val name: String,
@@ -27,6 +28,10 @@ data class FilesUiState(
     val fileContent: JsonElement? = null,
     val fileLoading: Boolean = false,
     val fileError: String? = null,
+    val fileSaving: Boolean = false,
+    val fileSaveError: String? = null,
+    val mkdirSaving: Boolean = false,
+    val mkdirError: String? = null,
 )
 
 class FilesViewModel(application: Application) : AndroidViewModel(application) {
@@ -62,6 +67,10 @@ class FilesViewModel(application: Application) : AndroidViewModel(application) {
                 fileContent = null,
                 filePath = null,
                 fileError = null,
+                fileSaving = false,
+                fileSaveError = null,
+                mkdirSaving = false,
+                mkdirError = null,
             )
             try {
                 val element = HermesRestClient.getJson("fs/list", mapOf("path" to path))
@@ -86,6 +95,8 @@ class FilesViewModel(application: Application) : AndroidViewModel(application) {
                 fileContent = null,
                 fileLoading = true,
                 fileError = null,
+                fileSaving = false,
+                fileSaveError = null,
             )
             try {
                 val element = HermesRestClient.getJson("fs/read-text", mapOf("path" to path))
@@ -108,7 +119,57 @@ class FilesViewModel(application: Application) : AndroidViewModel(application) {
             fileContent = null,
             fileLoading = false,
             fileError = null,
+            fileSaving = false,
+            fileSaveError = null,
         )
+    }
+
+    /** Overwrite (or create) a UTF-8 text file via `/api/fs/write-text`. */
+    fun writeFile(path: String, content: String, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(fileSaving = true, fileSaveError = null)
+            try {
+                val body = buildJsonObject {
+                    put("path", path)
+                    put("content", content)
+                }.toString()
+                HermesRestClient.post("fs/write-text", body)
+                _uiState.value = _uiState.value.copy(fileSaving = false)
+                openFile(path)
+                onDone(true)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    fileSaving = false,
+                    fileSaveError = e.message ?: "Failed to save file",
+                )
+                onDone(false)
+            }
+        }
+    }
+
+    /** Create a directory via `/api/files/mkdir`, then refresh the listing. */
+    fun mkdir(path: String, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(mkdirSaving = true, mkdirError = null)
+            try {
+                val body = buildJsonObject { put("path", path) }.toString()
+                HermesRestClient.post("files/mkdir", body)
+                _uiState.value = _uiState.value.copy(mkdirSaving = false)
+                loadDirectory(_uiState.value.path)
+                onDone(true)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    mkdirSaving = false,
+                    mkdirError = e.message ?: "Failed to create directory",
+                )
+                onDone(false)
+            }
+        }
+    }
+
+    /** Clear any previous file-save error when re-entering edit mode. */
+    fun resetFileSave() {
+        _uiState.value = _uiState.value.copy(fileSaving = false, fileSaveError = null)
     }
 
     fun breadcrumbParts(): List<String> {
