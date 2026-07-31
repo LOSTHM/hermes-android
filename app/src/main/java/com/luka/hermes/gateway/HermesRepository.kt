@@ -255,6 +255,66 @@ class HermesRepository(
         )
     }
 
+    /**
+     * Attach the frontend to an already-live session.
+     */
+    suspend fun activateSession(sessionId: String) {
+        client.request(
+            RpcMethods.SESSION_ACTIVATE,
+            buildJsonObject { put("session_id", JsonPrimitive(sessionId)) },
+        )
+    }
+
+    /**
+     * Close a session, tearing it down and unloading it from the daemon.
+     */
+    suspend fun closeSession(sessionId: String) {
+        client.request(
+            RpcMethods.SESSION_CLOSE,
+            buildJsonObject { put("session_id", JsonPrimitive(sessionId)) },
+        )
+    }
+
+    /**
+     * Undo the last turn in a session. Returns `{"removed": N}`.
+     */
+    suspend fun undoSession(sessionId: String): JsonElement {
+        return client.request(
+            RpcMethods.SESSION_UNDO,
+            buildJsonObject { put("session_id", JsonPrimitive(sessionId)) },
+        )
+    }
+
+    /**
+     * Fetch the token usage snapshot for a session.
+     */
+    suspend fun getSessionUsage(sessionId: String): JsonElement {
+        return client.request(
+            RpcMethods.SESSION_USAGE,
+            buildJsonObject { put("session_id", JsonPrimitive(sessionId)) },
+        )
+    }
+
+    /**
+     * Fetch the status lines for a session.
+     */
+    suspend fun getSessionStatus(sessionId: String): JsonElement {
+        return client.request(
+            RpcMethods.SESSION_STATUS,
+            buildJsonObject { put("session_id", JsonPrimitive(sessionId)) },
+        )
+    }
+
+    /**
+     * Fetch the context-window breakdown for a session.
+     */
+    suspend fun getSessionContextBreakdown(sessionId: String): JsonElement {
+        return client.request(
+            RpcMethods.SESSION_CONTEXT_BREAKDOWN,
+            buildJsonObject { put("session_id", JsonPrimitive(sessionId)) },
+        )
+    }
+
     // ── Config ────────────────────────────────────────────────────────────
 
     /**

@@ -18,6 +18,8 @@ object RpcMethods {
     const val SESSION_INTERRUPT = "session.interrupt"
     const val SESSION_COMPRESS = "session.compress"
     const val SESSION_BRANCH = "session.branch"
+    const val SESSION_CLOSE = "session.close"
+    const val SESSION_CONTEXT_BREAKDOWN = "session.context_breakdown"
     const val SESSION_UNDO = "session.undo"
 
     // ── Prompt ───────────────────────────────────────────────────────────

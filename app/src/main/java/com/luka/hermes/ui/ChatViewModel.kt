@@ -499,6 +499,66 @@ class ChatViewModel : ViewModel() {
         sendPrompt()
     }
 
+    // ── Session actions ─────────────────────────────────────────────────
+
+    /**
+     * Undo the last turn. In Hermes mode the daemon is asked to drop the
+     * trailing assistant/tool messages plus the last user message; the local
+     * list is trimmed to match. In DIRECT mode the last turn is removed locally.
+     */
+    fun undoLast() {
+        if (_uiState.value.isStreaming) return
+        val mode = _uiState.value.chatMode
+        viewModelScope.launch {
+            try {
+                if (mode == ChatMode.HERMES) {
+                    repository.undoSession(sessionId)
+                }
+                removeLastTurn()
+            } catch (e: Exception) {
+                addError("Failed to undo: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Refresh the session's token usage into
+     * [ChatUiState.promptTokens] / [ChatUiState.completionTokens].
+     */
+    fun loadSessionUsage() {
+        viewModelScope.launch {
+            try {
+                val result = repository.getSessionUsage(sessionId)
+                val obj = result as? JsonObject ?: return@launch
+                val prompt = listOf("prompt", "prompt_tokens", "input")
+                    .firstNotNullOfOrNull { obj[it]?.jsonPrimitive?.intOrNull }
+                val completion = listOf("completion", "completion_tokens", "output")
+                    .firstNotNullOfOrNull { obj[it]?.jsonPrimitive?.intOrNull }
+                if (prompt != null || completion != null) {
+                    _uiState.update { it.copy(
+                        promptTokens = prompt ?: 0,
+                        completionTokens = completion ?: 0,
+                    ) }
+                }
+            } catch (_: Exception) {
+                // Silently ignore usage load failures
+            }
+        }
+    }
+
+    /**
+     * Close the current Hermes session on the daemon.
+     */
+    fun closeSession() {
+        viewModelScope.launch {
+            try {
+                repository.closeSession(sessionId)
+            } catch (e: Exception) {
+                addError("Failed to close session: ${e.message}")
+            }
+        }
+    }
+
     // ── Attachment helpers ─────────────────────────────────────────────────
 
     /** Set the URI of an image picked from the gallery. */
@@ -551,6 +611,23 @@ class ChatViewModel : ViewModel() {
                     msgs[i] = msg.copy(text = msg.text + text)
                     break
                 }
+            }
+            state.copy(messages = msgs)
+        }
+    }
+
+    /**
+     * Drop everything after the last user message, then the user message
+     * itself — mirrors what `session.undo` removes server-side.
+     */
+    private fun removeLastTurn() {
+        _uiState.update { state ->
+            val msgs = state.messages.toMutableList()
+            while (msgs.isNotEmpty() && msgs.last() !is ChatItem.UserMessage) {
+                msgs.removeAt(msgs.size - 1)
+            }
+            if (msgs.isNotEmpty() && msgs.last() is ChatItem.UserMessage) {
+                msgs.removeAt(msgs.size - 1)
             }
             state.copy(messages = msgs)
         }

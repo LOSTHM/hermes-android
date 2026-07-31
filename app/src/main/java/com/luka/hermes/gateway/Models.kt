@@ -36,6 +36,29 @@ data class SessionInfo(
 )
 
 /**
+ * Token usage for a session, as returned by [RpcMethods.SESSION_USAGE].
+ *
+ * The wire shape is snake_case; the daemon reports both the generic
+ * `prompt_tokens`/`completion_tokens`/`total_tokens` keys and the Hermes‑native
+ * `prompt`/`completion`/`total` plus context‑window fields.
+ */
+@Serializable
+data class SessionUsage(
+    @SerialName("prompt_tokens") val promptTokens: Int? = null,
+    @SerialName("completion_tokens") val completionTokens: Int? = null,
+    @SerialName("total_tokens") val totalTokens: Int? = null,
+    @SerialName("context_window") val contextWindow: Int? = null,
+    @SerialName("prompt") val prompt: Int? = null,
+    @SerialName("completion") val completion: Int? = null,
+    @SerialName("total") val total: Int? = null,
+    @SerialName("context_used") val contextUsed: Int? = null,
+    @SerialName("context_max") val contextMax: Int? = null,
+    @SerialName("context_percent") val contextPercent: Int? = null,
+    val calls: Int? = null,
+    val model: String? = null,
+)
+
+/**
  * Configuration block returned by [RpcMethods.CONFIG_GET].
  * The [value] is a raw JSON node whose shape depends on the requested key
  * (e.g. `{"type":"openai","model":"gpt-4",…}` for key `"provider"`).

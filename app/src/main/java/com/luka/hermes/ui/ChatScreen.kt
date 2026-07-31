@@ -34,12 +34,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -160,9 +162,17 @@ fun ChatScreen(
                     IconButton(onClick = { showSearch = !showSearch; if (!showSearch) searchQuery = "" }) {
                         Icon(Icons.Filled.Search, contentDescription = "Search")
                     }
+                    IconButton(onClick = { hapticClick(context); viewModel.undoLast() }) {
+                        Icon(Icons.Default.Undo, contentDescription = "Undo")
+                    }
                     if (uiState.chatMode == ChatMode.DIRECT) {
                         IconButton(onClick = { viewModel.newDirectSession() }) {
                             Icon(Icons.Default.Add, contentDescription = "New Chat")
+                        }
+                    }
+                    if (uiState.chatMode == ChatMode.HERMES) {
+                        IconButton(onClick = { hapticClick(context); viewModel.closeSession() }) {
+                            Icon(Icons.Default.Close, contentDescription = "Close Session")
                         }
                     }
                 },
